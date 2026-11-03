@@ -44,6 +44,8 @@ public static class HealthEndpoints
     public static IEndpointRouteBuilder MapBusinessHealth(this IEndpointRouteBuilder app)
     {
         app.MapHealthChecks("/health", new HealthCheckOptions { ResponseWriter = WriteJson });
+        // Liveness para Docker: el proceso responde, sin depender de Data (para no reiniciar Business si Data cae).
+        app.MapHealthChecks("/alive", new HealthCheckOptions { Predicate = c => c.Name == "self", ResponseWriter = WriteJson });
         return app;
     }
 

@@ -1,0 +1,10 @@
+# Solo para desarrollo: publica Business (Scalar en /scalar/v1) y Postgres al host.
+services:
+  business:
+    environment:
+      OpenApi__Enabled: "true"
+    ports:
+      - "5002:5002"
+  postgres:
+    ports:
+      - "5432:5432"

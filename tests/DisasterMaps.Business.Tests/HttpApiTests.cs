@@ -84,8 +84,11 @@ public class DataTierDownTests(WebApplicationFactory<Program> factory) : IClassF
         var http = factory.WithWebHostBuilder(b => b
             .UseEnvironment("Production")
             .UseSetting("DataTier:UseFake", "false")
-            .UseSetting("DataTier:Address", "http://localhost:1")) // puerto cerrado
+            .UseSetting("DataTier:Address", "http://127.0.0.1:1")) // puerto cerrado (IPv4 directo: evita probar ::1 y luego 127.0.0.1)
             .CreateClient();
+
+        // Calentamiento: se mide el comportamiento de Business ante Data caído, no el arranque en frío (JIT) del host de pruebas.
+        await http.GetAsync("/alive");
 
         var watch = Stopwatch.StartNew();
         var response = await http.GetAsync("/api/v1/events");
