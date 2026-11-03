@@ -1,0 +1,21 @@
+latitude,longitude,severity,affected_people,municipality,department,description,reported_at
+1.152200,-76.646600,CRITICAL,850,Mocoa,Putumayo,Avalancha sobre barrio San Miguel,2017-04-01T03:10:00Z
+1.148900,-76.651200,HIGH,320,Mocoa,Putumayo,Colapso de vivienda en barrio Los Laureles,2017-04-01T03:25:00Z
+1.160300,-76.639800,,45,Mocoa,Putumayo,Vía obstruida por lodo,2017-04-01T04:00:00Z
+95.000000,-76.640000,HIGH,12,Mocoa,Putumayo,Fila inválida a propósito: latitud fuera de rango,2017-04-01T04:10:00Z
+1.143500,-76.655700,MEDIUM,30,Mocoa,Putumayo,Puente peatonal afectado,2017-04-01T04:30:00Z
+1.167800,-76.633100,,0,Mocoa,Putumayo,Daño en tubería de acueducto,2017-04-01T05:00:00Z
+1.139200,-76.661400,HIGH,210,Mocoa,Putumayo,Inundación en barrio San Fernando,
+1.155600,-76.628900,LOW,3,Mocoa,Putumayo,Árbol caído sobre vía secundaria,2017-04-01T06:15:00Z
+0.000000,0.000000,LOW,5,Mocoa,Putumayo,Fila inválida a propósito: coordenada vacía (0 0),2017-04-01T06:30:00Z
+1.081100,-76.598400,MEDIUM,18,Villagarzón,Putumayo,Deslizamiento menor en vereda,2017-04-01T07:00:00Z
+8.542300,-74.633600,HIGH,410,Majagual,Sucre,Desbordamiento del río Cauca,2021-08-27T10:00:00Z
+8.469700,-74.537900,CRITICAL,1200,Guaranda,Sucre,Rompimiento del dique Cara de Gato,2021-08-27T11:30:00Z
+8.811900,-74.721400,,75,Sucre,Sucre,Cultivos inundados,2021-08-28T09:00:00Z
+8.660200,-75.128600,MEDIUM,40,San Marcos,Sucre,Anegamiento de vías rurales,2021-08-28T12:00:00Z
+8.550100,-74.620200,HIGH,-7,Majagual,Sucre,Fila inválida a propósito: personas afectadas negativas,2021-08-28T13:00:00Z
+8.475400,-74.545100,,260,Guaranda,Sucre,Familias evacuadas a albergue,2021-08-29T08:00:00Z
+8.533800,-74.650900,LOW,0,Majagual,Sucre,Monitoreo de nivel del río,2021-08-29T15:00:00Z
+8.805500,-74.730200,HIGH,150,Sucre,Sucre,Escuela rural inundada,2021-08-30T10:30:00Z
+8.672300,-75.140100,,12,San Marcos,Sucre,Pozo séptico colapsado,
+8.488800,-74.560300,CRITICAL,900,Guaranda,Sucre,Corregimiento incomunicado,2021-08-31T07:45:00Z

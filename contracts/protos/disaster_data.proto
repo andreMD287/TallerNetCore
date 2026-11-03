@@ -1,0 +1,85 @@
+syntax = "proto3";
+
+package disastermaps.data.v1;
+option csharp_namespace = "DisasterMaps.Contracts.Data.V1";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/wrappers.proto";
+
+service DisasterData {
+  rpc CreateEvent (CreateEventRequest) returns (EventReply);
+  rpc ListEvents (ListEventsRequest) returns (ListEventsReply);
+
+  rpc CreateImpact (CreateImpactRequest) returns (ImpactReply);
+  rpc CreateImpactsBatch (CreateImpactsBatchRequest) returns (BatchReply);
+  rpc GetImpact (GetByIdRequest) returns (ImpactReply);
+  rpc ListImpacts (ImpactFilter) returns (ListImpactsReply);
+  rpc UpdateImpact (UpdateImpactRequest) returns (ImpactReply);
+  rpc DeleteImpact (GetByIdRequest) returns (DeleteReply);
+  rpc SummaryByMunicipality (ImpactFilter) returns (SummaryReply);
+}
+
+enum EventType { EVENT_TYPE_UNSPECIFIED = 0; FLOOD = 1; LANDSLIDE = 2; EARTHQUAKE = 3; WILDFIRE = 4; WINDSTORM = 5; OTHER = 6; }
+enum Severity { SEVERITY_UNSPECIFIED = 0; LOW = 1; MEDIUM = 2; HIGH = 3; CRITICAL = 4; }
+enum ImpactSource { IMPACT_SOURCE_UNSPECIFIED = 0; MANUAL = 1; FILE = 2; DEVICE = 3; }
+enum ImpactStatus { IMPACT_STATUS_UNSPECIFIED = 0; REPORTED = 1; VERIFIED = 2; ATTENDED = 3; }
+
+message DisasterEvent {
+  string id = 1;                              // UUID, lo genera Business
+  string name = 2;
+  EventType type = 3;
+  google.protobuf.Timestamp started_at = 4;
+  string description = 5;
+}
+
+message Impact {
+  string id = 1;                              // UUID v7, lo genera Business (idempotencia)
+  string event_id = 2;
+  double latitude = 3;                        // WGS84, [-90, 90]
+  double longitude = 4;                       // WGS84, [-180, 180]
+  Severity severity = 5;                      // nunca UNSPECIFIED al llegar a Data
+  int32 affected_people = 6;                  // >= 0
+  string municipality = 7;
+  string department = 8;
+  string description = 9;
+  google.protobuf.Timestamp reported_at = 10; // UTC
+  ImpactSource source = 11;
+  ImpactStatus status = 12;
+}
+
+message CreateEventRequest { DisasterEvent event = 1; }
+message EventReply { DisasterEvent event = 1; }
+message ListEventsRequest {}
+message ListEventsReply { repeated DisasterEvent events = 1; }
+
+message CreateImpactRequest { Impact impact = 1; }
+message CreateImpactsBatchRequest { repeated Impact impacts = 1; } // atómico: todo o nada
+message BatchReply { int32 inserted = 1; }
+message GetByIdRequest { string id = 1; }
+message ImpactReply { Impact impact = 1; }
+message UpdateImpactRequest { Impact impact = 1; }
+message DeleteReply { bool deleted = 1; }
+
+message ImpactFilter {
+  string event_id = 1;                         // vacío = todos
+  EventType event_type = 2;                    // UNSPECIFIED = todos
+  Severity min_severity = 3;                   // UNSPECIFIED = todas
+  google.protobuf.DoubleValue min_lat = 4;     // bbox opcional (los 4 o ninguno)
+  google.protobuf.DoubleValue max_lat = 5;
+  google.protobuf.DoubleValue min_lon = 6;
+  google.protobuf.DoubleValue max_lon = 7;
+  google.protobuf.Timestamp from = 8;          // opcional
+  google.protobuf.Timestamp to = 9;            // opcional
+  int32 page = 10;                             // base 1; 0 => 1
+  int32 page_size = 11;                        // 0 => 100; máximo 2000
+}
+message ListImpactsReply { repeated Impact impacts = 1; int32 total = 2; }
+
+message MunicipalitySummary {
+  string municipality = 1;
+  string department = 2;
+  int32 impacts = 3;
+  int32 affected_people = 4;
+  Severity max_severity = 5;
+}
+message SummaryReply { repeated MunicipalitySummary items = 1; }

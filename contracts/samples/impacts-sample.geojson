@@ -1,0 +1,15 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [-76.6440, 1.1501] }, "properties": { "severity": "HIGH", "affected_people": 140, "municipality": "Mocoa", "department": "Putumayo", "description": "Viviendas con lodo hasta el techo", "reported_at": "2017-04-01T08:00:00Z" } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [-76.6502, 1.1577] }, "properties": { "severity": null, "affected_people": 600, "municipality": "Mocoa", "department": "Putumayo", "description": "Barrio aislado por avalancha", "reported_at": "2017-04-01T08:20:00Z" } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [-76.6381, 1.1455] }, "properties": { "severity": "MEDIUM", "affected_people": 22, "municipality": "Mocoa", "department": "Putumayo", "description": "Daño en red eléctrica", "reported_at": "2017-04-01T09:00:00Z" } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [-76.6611, 1.1622] }, "properties": { "severity": "LOW", "affected_people": 0, "municipality": "Mocoa", "department": "Putumayo", "description": "Grieta en vía principal", "reported_at": null } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [-76.6055, 1.0850] }, "properties": { "severity": null, "affected_people": 35, "municipality": "Villagarzón", "department": "Putumayo", "description": "Cultivos afectados por creciente", "reported_at": "2017-04-02T07:00:00Z" } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [-74.6301, 8.5480] }, "properties": { "severity": "HIGH", "affected_people": 380, "municipality": "Majagual", "department": "Sucre", "description": "Casco urbano con agua", "reported_at": "2021-09-01T10:00:00Z" } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [-74.5502, 8.4633] }, "properties": { "severity": "CRITICAL", "affected_people": 1500, "municipality": "Guaranda", "department": "Sucre", "description": "Brecha ampliada en el dique", "reported_at": "2021-09-01T11:00:00Z" } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [-74.7155, 8.8170] }, "properties": { "severity": null, "affected_people": 8, "municipality": "Sucre", "department": "Sucre", "description": "Ganado rescatado", "reported_at": "2021-09-01T12:00:00Z" } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [-75.1350, 8.6544] }, "properties": { "severity": "MEDIUM", "affected_people": 48, "municipality": "San Marcos", "department": "Sucre", "description": "Centro de salud con humedad", "reported_at": "2021-09-02T09:30:00Z" } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [-74.6420, 8.5290] }, "properties": { "severity": "LOW", "affected_people": 0, "municipality": "Majagual", "department": "Sucre", "description": "Bote de rescate en espera", "reported_at": "2021-09-02T14:00:00Z" } }
+  ]
+}

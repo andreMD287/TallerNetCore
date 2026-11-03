@@ -1,0 +1,4 @@
+@Business_HostAddress = http://localhost:5002
+
+### Salud
+GET {{Business_HostAddress}}/health
