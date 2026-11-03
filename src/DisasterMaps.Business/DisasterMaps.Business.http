@@ -1,4 +1,66 @@
-@Business_HostAddress = http://localhost:5002
+# Ejemplos de la API v1 de Business. En Development usa FakeDataGateway (eventos semilla abajo).
+@base = http://localhost:5002
+@eventId = 01900000-0000-7000-8000-000000000001
 
-### Salud
-GET {{Business_HostAddress}}/health
+### Salud (incluye el chequeo gRPC de Data)
+GET {{base}}/health
+
+### Listar eventos
+GET {{base}}/api/v1/events
+
+### Crear evento
+POST {{base}}/api/v1/events
+Content-Type: application/json
+
+{ "name": "Inundación Gramalote (ejemplo)", "type": "FLOOD", "startedAt": "2026-10-20T12:00:00Z", "description": "Datos de ejemplo" }
+
+### Recibir una afectación (severidad derivada: 120 personas → HIGH)
+# @name created
+POST {{base}}/api/v1/impacts
+Content-Type: application/json
+
+{ "eventId": "{{eventId}}", "latitude": 1.1522, "longitude": -76.6466, "severity": null, "affectedPeople": 120,
+  "municipality": "Mocoa", "department": "Putumayo", "description": "Vivienda afectada", "reportedAt": null, "source": "MANUAL" }
+
+### Afectación inválida → 400 ValidationProblemDetails
+POST {{base}}/api/v1/impacts
+Content-Type: application/json
+
+{ "eventId": "{{eventId}}", "latitude": 0, "longitude": 0, "affectedPeople": -1 }
+
+### Detalle
+GET {{base}}/api/v1/impacts/{{created.response.body.id}}
+
+### Actualizar (REPORTED → VERIFIED)
+PUT {{base}}/api/v1/impacts/{{created.response.body.id}}
+Content-Type: application/json
+
+{ "eventId": "{{eventId}}", "latitude": 1.1522, "longitude": -76.6466, "affectedPeople": 120,
+  "municipality": "Mocoa", "department": "Putumayo", "description": "Verificada en campo", "status": "VERIFIED" }
+
+### Listar con filtros y paginación
+GET {{base}}/api/v1/impacts?eventId={{eventId}}&minSeverity=HIGH&page=1&pageSize=50
+
+### GeoJSON para el mapa (bbox de Putumayo)
+GET {{base}}/api/v1/impacts/geojson?minLat=0&maxLat=2&minLon=-77.5&maxLon=-75.5
+
+### Importar CSV (esperado 17 aceptadas / 3 rechazadas)
+POST {{base}}/api/v1/impacts/import
+Content-Type: multipart/form-data; boundary=b
+
+--b
+Content-Disposition: form-data; name="eventId"
+
+{{eventId}}
+--b
+Content-Disposition: form-data; name="file"; filename="impacts-sample.csv"
+Content-Type: text/csv
+
+< ../../contracts/samples/impacts-sample.csv
+--b--
+
+### Resumen por municipio
+GET {{base}}/api/v1/stats/by-municipality?eventId={{eventId}}
+
+### Borrado lógico
+DELETE {{base}}/api/v1/impacts/{{created.response.body.id}}

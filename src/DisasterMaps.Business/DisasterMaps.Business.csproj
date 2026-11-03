@@ -12,12 +12,14 @@
 
   <ItemGroup>
     <PackageReference Include="Google.Protobuf" Version="3.36.2" />
+    <PackageReference Include="Grpc.HealthCheck" Version="2.85.0" />
     <PackageReference Include="Grpc.Net.ClientFactory" Version="2.85.0" />
     <PackageReference Include="Grpc.Tools" Version="2.85.0">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.14" />
+    <PackageReference Include="Scalar.AspNetCore" Version="2.18.7" />
   </ItemGroup>
 
 </Project>

@@ -1,16 +1,136 @@
-// Tier 2 - Negocio (dueño: Rol 1). Esqueleto del día 0.
+// Tier 2 - Negocio (dueño: Rol 1). REST /api/v1 hacia arriba, gRPC hacia el tier de Datos.
+using System.Diagnostics;
+using DisasterMaps.Business.Api;
+using DisasterMaps.Business.Application;
+using DisasterMaps.Business.DataGateway;
+using DisasterMaps.Business.Domain;
+using DisasterMaps.Business.Errors;
+using DisasterMaps.Business.Import;
+using DisasterMaps.Business.Json;
+using DisasterMaps.Business.Validation;
+using DisasterMaps.Contracts.Data.V1;
+using Grpc.Health.V1;
+using Microsoft.AspNetCore.Mvc;
+using Scalar.AspNetCore;
+
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers();
+// ---- Logging estructurado: JSON por línea con TraceId/SpanId (decisión R1-02) ----
+builder.Logging.ClearProviders();
+builder.Logging.AddJsonConsole(o =>
+{
+    o.IncludeScopes = true;
+    o.UseUtcTimestamp = true;
+    o.TimestampFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
+    o.JsonWriterOptions = new System.Text.Json.JsonWriterOptions
+    {
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping, // tildes legibles
+    };
+});
+builder.Logging.Configure(o => o.ActivityTrackingOptions =
+    ActivityTrackingOptions.TraceId | ActivityTrackingOptions.SpanId | ActivityTrackingOptions.ParentId);
+
+// ---- Configuración (equivalente a CDI/JNDI: direcciones y umbrales fuera del código) ----
+builder.Services.Configure<DataTierOptions>(builder.Configuration.GetSection(DataTierOptions.Section));
+builder.Services.Configure<SeverityThresholds>(builder.Configuration.GetSection(SeverityThresholds.Section));
+var dataTier = builder.Configuration.GetSection(DataTierOptions.Section).Get<DataTierOptions>() ?? new DataTierOptions();
+
+// ---- Fachada hacia Datos: fake en memoria o cliente gRPC real ----
+if (dataTier.UseFake)
+{
+    builder.Services.AddSingleton<IDataGateway>(_ => new FakeDataGateway());
+}
+else
+{
+    var address = new Uri(dataTier.Address);
+    builder.Services.AddGrpcClient<DisasterData.DisasterDataClient>(o => o.Address = address)
+        .ConfigureChannel(c => c.ServiceConfig = GrpcRetryPolicy.Create());
+    builder.Services.AddGrpcClient<Health.HealthClient>(o => o.Address = address);
+    builder.Services.AddScoped<IDataGateway, GrpcDataGateway>();
+}
+
+// ---- Dominio, validación, importación y servicios de aplicación (sin estado) ----
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<SeverityPolicy>();
+builder.Services.AddSingleton<CreateImpactValidator>();
+builder.Services.AddSingleton<UpdateImpactValidator>();
+builder.Services.AddSingleton<CreateEventValidator>();
+builder.Services.AddSingleton<IImpactFileParser, CsvImpactParser>();
+builder.Services.AddSingleton<IImpactFileParser, GeoJsonImpactParser>();
+builder.Services.AddSingleton<ImportRowConverter>();
+builder.Services.AddScoped<EventService>();
+builder.Services.AddScoped<ImpactService>();
+builder.Services.AddScoped<ImportService>();
+
+// ---- API REST ----
+builder.Services.AddControllers(o =>
+    {
+        var m = o.ModelBindingMessageProvider;
+        m.SetValueIsInvalidAccessor(v => $"El valor '{v}' no es válido.");
+        m.SetAttemptedValueIsInvalidAccessor((v, f) => $"El valor '{v}' no es válido para {f}.");
+        m.SetValueMustNotBeNullAccessor(f => $"El campo {f} es obligatorio.");
+        m.SetMissingRequestBodyRequiredValueAccessor(() => "El cuerpo de la solicitud es obligatorio.");
+        m.SetNonPropertyAttemptedValueIsInvalidAccessor(v => $"El valor '{v}' no es válido.");
+        m.SetUnknownValueIsInvalidAccessor(f => $"El valor de {f} no es válido.");
+    })
+    .AddJsonOptions(o => JsonSetup.Configure(o.JsonSerializerOptions))
+    .ConfigureApiBehaviorOptions(o => o.InvalidModelStateResponseFactory = InvalidModelState);
+builder.Services.ConfigureHttpJsonOptions(o => JsonSetup.Configure(o.SerializerOptions));
+
+builder.Services.AddProblemDetails(o => o.CustomizeProblemDetails = GlobalExceptionHandler.Customize);
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddBusinessHealthChecks();
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
+app.UseExceptionHandler();
+app.UseStatusCodePages();
+
+if (app.Environment.IsDevelopment() || app.Configuration.GetValue<bool>("OpenApi:Enabled"))
 {
     app.MapOpenApi();
+    app.MapScalarApiReference(o => o.WithTitle("DisasterMaps · Business API v1"));
 }
 
 app.MapControllers();
+app.MapBusinessHealth();
+app.MapGet("/", () => Results.Redirect("/scalar/v1")).ExcludeFromDescription();
+
+app.Logger.LogInformation("Business iniciado. Tier de Datos: {Mode} {Address}",
+    dataTier.UseFake ? "FAKE" : "gRPC", dataTier.UseFake ? "(memoria)" : dataTier.Address);
 
 app.Run();
+
+// Errores de binding/JSON → ValidationProblemDetails en español, con nombres de campo limpios.
+static IActionResult InvalidModelState(ActionContext ctx)
+{
+    var errors = new Dictionary<string, string[]>();
+    foreach (var (key, entry) in ctx.ModelState)
+    {
+        if (entry.Errors.Count == 0) continue;
+        if (key.StartsWith("$.", StringComparison.Ordinal) || key == "$")
+        {
+            var field = key == "$" ? "body" : char.ToLowerInvariant(key[2]) + key[3..];
+            errors[field] = ["El valor no es válido o no tiene el formato esperado."];
+        }
+        else
+        {
+            errors[string.IsNullOrEmpty(key) ? "body" : char.ToLowerInvariant(key[0]) + key[1..]] =
+                entry.Errors.Select(e => string.IsNullOrEmpty(e.ErrorMessage) ? "El valor no es válido." : e.ErrorMessage).ToArray();
+        }
+    }
+    // Si el JSON era inválido, ASP.NET agrega además "request: obligatorio"; se omite si hay errores más precisos.
+    if (errors.Count > 1) errors.Remove("request");
+
+    var problem = new ValidationProblemDetails(errors)
+    {
+        Title = "Uno o más campos no son válidos.",
+        Status = StatusCodes.Status400BadRequest,
+        Extensions = { ["traceId"] = Activity.Current?.TraceId.ToString() ?? ctx.HttpContext.TraceIdentifier },
+    };
+    return new BadRequestObjectResult(problem) { ContentTypes = { "application/problem+json" } };
+}
+
+/// <summary>Visible para WebApplicationFactory en las pruebas.</summary>
+public partial class Program;
