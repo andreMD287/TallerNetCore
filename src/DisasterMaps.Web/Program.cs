@@ -1,29 +1,20 @@
+using DisasterMaps.Web.Clients;
+
 var builder = WebApplication.CreateBuilder(args);
-
-// Add services to the container.
 builder.Services.AddControllersWithViews();
-
+if (builder.Configuration.GetValue<bool>("Business:UseFake"))
+    builder.Services.AddSingleton<IBusinessApiClient, FakeBusinessApiClient>();
+else
+    builder.Services.AddHttpClient<IBusinessApiClient, BusinessApiClient>(client =>
+    {
+        client.BaseAddress = new Uri(builder.Configuration["Business:BaseUrl"] ?? "http://localhost:5002");
+        client.Timeout = TimeSpan.FromSeconds(5);
+    });
 var app = builder.Build();
-
-// Configure the HTTP request pipeline.
-if (!app.Environment.IsDevelopment())
-{
-    app.UseExceptionHandler("/Home/Error");
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
-    app.UseHsts();
-}
-
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment()) app.UseExceptionHandler("/Home/Error");
+// HTTP puro en desarrollo y compose; no forzar redirección a HTTPS.
+app.UseStaticFiles();
 app.UseRouting();
-
 app.UseAuthorization();
-
-app.MapStaticAssets();
-
-app.MapControllerRoute(
-    name: "default",
-    pattern: "{controller=Home}/{action=Index}/{id?}")
-    .WithStaticAssets();
-
-
+app.MapControllerRoute("default", "{controller=Map}/{action=Index}/{id?}");
 app.Run();

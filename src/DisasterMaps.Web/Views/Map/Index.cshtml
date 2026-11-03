@@ -1,0 +1,82 @@
+@using System.Text.Json.Nodes
+@{
+  ViewData["Title"] = "Mapa de desastres";
+  var events = ViewBag.Events as JsonArray ?? new JsonArray();
+}
+@section Styles {
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+}
+<div class="d-flex justify-content-between flex-wrap align-items-center mb-4 gap-2">
+  <div><h1>Mapa de afectaciones</h1><p class="lead-small mb-0">Visualización geográfica en Colombia · actualización automática cada 15 segundos</p></div>
+  <a class="btn btn-primary" href="/Impacts/Create">+ Registrar coordenada</a>
+</div>
+<div class="row g-3">
+  <div class="col-lg-3">
+    <div class="panel mb-3">
+      <h5>Filtros</h5>
+      <form id="filters" class="vstack gap-3">
+        <div><label class="form-label">Evento</label><select name="eventId" class="form-select"><option value="">Todos</option>
+          @foreach (var e in events) { <option value="@(e?["id"]?.ToString())">@(e?["name"]?.ToString())</option> }
+        </select></div>
+        <div><label class="form-label">Tipo de desastre</label><select name="eventType" class="form-select">
+          <option value="">Todos</option><option>FLOOD</option><option>LANDSLIDE</option><option>EARTHQUAKE</option><option>WILDFIRE</option><option>WINDSTORM</option><option>OTHER</option>
+        </select></div>
+        <div><label class="form-label">Severidad mínima</label><select name="minSeverity" class="form-select">
+          <option value="">Todas</option><option>LOW</option><option>MEDIUM</option><option>HIGH</option><option>CRITICAL</option>
+        </select></div>
+        <div><label class="form-label">Desde</label><input type="date" name="from" class="form-control" /></div>
+        <div><label class="form-label">Hasta</label><input type="date" name="to" class="form-control" /></div>
+        <button type="submit" class="btn btn-primary">Aplicar filtros</button>
+        <button type="button" class="btn btn-outline-secondary" onclick="refresh()">Actualizar</button>
+      </form>
+    </div>
+    <div class="panel"><strong>Leyenda</strong><div class="legend mt-3">
+      <span><i style="background:#38a169"></i>Baja</span>
+      <span><i style="background:#e5b135"></i>Media</span>
+      <span><i style="background:#f07835"></i>Alta</span>
+      <span><i style="background:#d53745"></i>Crítica</span>
+    </div><p class="small-note mt-3 mb-0">Haz clic sobre el mapa para registrar la ubicación elegida.</p></div>
+  </div>
+  <div class="col-lg-9"><div class="panel"><div class="d-flex justify-content-between mb-2"><strong>Afectaciones reportadas</strong><span id="count" class="text-muted">Cargando…</span></div>
+    <div id="map"></div><div id="mapError" class="alert alert-warning mt-3 d-none"></div>
+  </div></div>
+</div>
+@section Scripts {
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <script>
+    const map=L.map('map').setView([4.6,-74.1],6);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; OpenStreetMap contributors',maxZoom:18}).addTo(map);
+    let layer=L.layerGroup().addTo(map);
+    const colors={LOW:'#38a169',MEDIUM:'#e5b135',HIGH:'#f07835',CRITICAL:'#d53745'};
+    const safe=v=>String(v??'—').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
+    let firstLoad=true;
+    async function refresh(){
+      const fields=new FormData(document.getElementById('filters'));
+      const params=new URLSearchParams();
+      for(const [k,v] of fields) if(v)params.set(k,v);
+      const warning=document.getElementById('mapError');warning.classList.add('d-none');
+      try{
+        const res=await fetch('/map/data?'+params.toString());if(!res.ok)throw new Error('El servicio no está disponible. Intenta de nuevo en unos segundos.');
+        const data=await res.json();if(!data||!Array.isArray(data.features))throw new Error('Respuesta geográfica inválida.');
+        map.removeLayer(layer);
+        const grouped=data.features.length>500&&typeof L.markerClusterGroup==='function';
+        layer=grouped?L.markerClusterGroup():L.layerGroup();
+        const geo=L.geoJSON(data,{pointToLayer:(feature,latlng)=>L.circleMarker(latlng,{radius:7,color:'#fff',weight:1.5,fillColor:colors[feature.properties?.severity]||'#487fbd',fillOpacity:.9}),
+          onEachFeature:(feature,marker)=>{
+            const p=feature.properties||{};
+            marker.bindPopup(`<b>${safe(p.municipality)}</b>, ${safe(p.department)}<hr class="my-1">Severidad: ${safe(p.severity)}<br>Personas: ${safe(p.affectedPeople)}<br>Fecha: ${safe(p.reportedAt)}<br>Fuente: ${safe(p.source)}<br>Estado: ${safe(p.status)}<br>${safe(p.description)}`);
+          }});
+        if(grouped)geo.eachLayer(m=>layer.addLayer(m));else geo.eachLayer(m=>layer.addLayer(m));
+        layer.addTo(map);document.getElementById('count').textContent=`${data.features.length} puntos`;
+        if(firstLoad&&data.features.length&&document.querySelector('[name=eventId]').value){map.fitBounds(geo.getBounds(),{padding:[30,30],maxZoom:12});}
+        firstLoad=false;
+      }catch(e){map.removeLayer(layer);layer=L.layerGroup().addTo(map);document.getElementById('count').textContent='Sin datos';warning.textContent=e.message;warning.classList.remove('d-none');}
+    }
+    document.getElementById('filters').addEventListener('submit',e=>{e.preventDefault();firstLoad=true;refresh();});
+    map.on('click',e=>{if(confirm('¿Registrar una afectación en esta ubicación?'))location.href='/Impacts/Create?latitude='+e.latlng.lat.toFixed(6)+'&longitude='+e.latlng.lng.toFixed(6);});
+    refresh();setInterval(refresh,15000);
+  </script>
+}

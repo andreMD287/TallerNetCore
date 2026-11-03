@@ -1,0 +1,7 @@
+@model System.Text.Json.Nodes.JsonNode
+@using System.Text.Json.Nodes
+@{ ViewData["Title"] = "Afectaciones"; var rows=Model?["items"] as JsonArray ?? new JsonArray(); var page=(int)(ViewBag.Page ?? 1); }
+<div class="d-flex justify-content-between align-items-center mb-4"><div><h1>Afectaciones</h1><p class="lead-small">Total: @(Model?["total"]?.ToString() ?? "0") · Página @(page)</p></div><a class="btn btn-primary" href="/Impacts/Create">+ Registrar afectación</a></div>
+<div class="panel table-responsive"><table class="table table-hover align-middle"><thead><tr><th>Municipio</th><th>Coordenadas</th><th>Severidad</th><th>Personas</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>
+@foreach(var i in rows){<tr><td>@(i?["municipality"]?.ToString())</td><td>@(i?["latitude"]?.ToString()), @(i?["longitude"]?.ToString())</td><td><span class="badge bg-warning text-dark">@(i?["severity"]?.ToString())</span></td><td>@(i?["affectedPeople"]?.ToString())</td><td>@(i?["status"]?.ToString())</td><td class="d-flex gap-2"><a class="btn btn-sm btn-outline-primary" href="/Impacts/Edit/@(i?["id"]?.ToString())">Editar</a><form method="post" action="/Impacts/Delete/@(i?["id"]?.ToString())" onsubmit="return confirm('¿Eliminar esta afectación?')">@Html.AntiForgeryToken()<button class="btn btn-sm btn-outline-danger">Borrar</button></form></td></tr>}
+</tbody></table><div class="d-flex gap-2"><a href="/Impacts?page=@Math.Max(1,page-1)" class="btn btn-outline-secondary">Anterior</a><a href="/Impacts?page=@(page+1)" class="btn btn-outline-secondary">Siguiente</a></div></div>

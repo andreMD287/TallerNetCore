@@ -1,0 +1,8 @@
+@model System.Text.Json.Nodes.JsonArray
+@using System.Text.Json.Nodes
+@{ ViewData["Title"] = "Resumen municipal"; var events=ViewBag.Events as JsonArray ?? new JsonArray(); }
+<h1>Resumen por municipio</h1><p class="lead-small">Consultas de agregación mediante LINQ traducidas a SQL.</p>
+<div class="panel mb-3"><form method="get" class="d-flex gap-2"><select name="eventId" class="form-select"><option value="">Todos los eventos</option>@foreach(var e in events){<option value="@(e?["id"]?.ToString())">@(e?["name"]?.ToString())</option>}</select><button class="btn btn-primary">Filtrar</button></form></div>
+<div class="panel table-responsive"><table class="table table-hover"><thead><tr><th>Municipio</th><th>Departamento</th><th>Afectaciones</th><th>Personas</th><th>Máxima severidad</th></tr></thead><tbody>
+@foreach(var x in Model){<tr><td>@(x?["municipality"]?.ToString())</td><td>@(x?["department"]?.ToString())</td><td>@(x?["impacts"]?.ToString())</td><td>@(x?["affectedPeople"]?.ToString())</td><td>@(x?["maxSeverity"]?.ToString())</td></tr>}
+</tbody></table></div>

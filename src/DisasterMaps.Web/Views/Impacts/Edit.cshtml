@@ -1,0 +1,8 @@
+@model System.Text.Json.Nodes.JsonNode
+@{ ViewData["Title"] = "Cambiar estado"; var status=Model?["status"]?.ToString() ?? "REPORTED"; var next=status=="REPORTED"?"VERIFIED":status=="VERIFIED"?"ATTENDED":""; }
+<h1>Editar afectación</h1>
+<div class="panel col-lg-7"><p><strong>Municipio:</strong> @(Model?["municipality"]?.ToString())</p><p><strong>Estado actual:</strong> @status</p>
+@if(next!=""){
+<form method="post">@Html.AntiForgeryToken()<input type="hidden" name="status" value="@next"/><button class="btn btn-primary">Avanzar a @next</button> <a class="btn btn-outline-secondary" href="/Impacts">Cancelar</a></form>
+}else{<p class="alert alert-success">La afectación ya está atendida. No se permite retroceder.</p><a href="/Impacts" class="btn btn-outline-secondary">Volver</a>}
+</div>

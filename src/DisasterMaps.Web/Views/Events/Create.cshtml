@@ -1,0 +1,13 @@
+@model DisasterMaps.Web.Models.EventForm
+@{ ViewData["Title"] = "Crear evento"; }
+<h1>Registrar evento</h1>
+<div class="panel col-lg-7">
+  <form method="post" class="vstack gap-3">
+    <div asp-validation-summary="All" class="text-danger"></div>
+    <div><label asp-for="Name" class="form-label">Nombre</label><input asp-for="Name" class="form-control" required /></div>
+    <div><label asp-for="Type" class="form-label">Tipo</label><select asp-for="Type" class="form-select"><option>FLOOD</option><option>LANDSLIDE</option><option>EARTHQUAKE</option><option>WILDFIRE</option><option>WINDSTORM</option><option>OTHER</option></select></div>
+    <div><label asp-for="StartedAt" class="form-label">Fecha y hora (UTC)</label><input asp-for="StartedAt" type="datetime-local" class="form-control" /></div>
+    <div><label asp-for="Description" class="form-label">Descripción</label><textarea asp-for="Description" class="form-control"></textarea></div>
+    <div><button class="btn btn-primary">Guardar</button> <a class="btn btn-outline-secondary" href="/Events">Cancelar</a></div>
+  </form>
+</div>

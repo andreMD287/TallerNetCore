@@ -1,0 +1,16 @@
+@model DisasterMaps.Web.Models.ImpactForm
+@using System.Text.Json.Nodes
+@{ ViewData["Title"] = "Registrar afectación"; var events=ViewBag.Events as JsonArray ?? new JsonArray(); }
+<h1>Registrar afectación</h1><p class="lead-small">Las coordenadas pueden seleccionarse haciendo clic en el mapa de inicio.</p>
+<div class="panel col-lg-8"><form method="post" class="row g-3">
+  <div asp-validation-summary="All" class="text-danger"></div>
+  <div class="col-12"><label class="form-label">Evento</label><select asp-for="EventId" class="form-select" required><option value="">Selecciona un evento</option>@foreach(var e in events){<option value="@(e?["id"]?.ToString())">@(e?["name"]?.ToString())</option>}</select></div>
+  <div class="col-md-6"><label class="form-label">Latitud</label><input asp-for="Latitude" type="number" step="any" min="-90" max="90" class="form-control" /></div>
+  <div class="col-md-6"><label class="form-label">Longitud</label><input asp-for="Longitude" type="number" step="any" min="-180" max="180" class="form-control" /></div>
+  <div class="col-md-6"><label class="form-label">Severidad</label><select asp-for="Severity" class="form-select"><option value="">Automática según personas</option><option>LOW</option><option>MEDIUM</option><option>HIGH</option><option>CRITICAL</option></select></div>
+  <div class="col-md-6"><label class="form-label">Personas afectadas</label><input asp-for="AffectedPeople" class="form-control" type="number" min="0" /></div>
+  <div class="col-md-6"><label class="form-label">Municipio</label><input asp-for="Municipality" class="form-control" /></div>
+  <div class="col-md-6"><label class="form-label">Departamento</label><input asp-for="Department" class="form-control" /></div>
+  <div class="col-12"><label class="form-label">Descripción</label><textarea asp-for="Description" class="form-control"></textarea></div>
+  <div class="col-12"><button class="btn btn-primary">Guardar afectación</button> <a href="/" class="btn btn-outline-secondary">Volver al mapa</a></div>
+</form></div>

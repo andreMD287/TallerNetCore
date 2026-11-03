@@ -1,0 +1,14 @@
+@using System.Text.Json.Nodes
+@{ ViewData["Title"] = "Importar coordenadas"; var events=ViewBag.Events as JsonArray ?? new JsonArray(); var report=ViewBag.Report as JsonNode; }
+<h1>Importar coordenadas</h1><p class="lead-small">Archivos CSV y GeoJSON · Máximo 5 MB / 10.000 filas</p>
+<div class="panel col-lg-8 mb-4"><form method="post" enctype="multipart/form-data" class="vstack gap-3">
+  <div><label class="form-label">Evento de destino</label><select name="eventId" class="form-select" required><option value="">Selecciona un evento</option>@foreach(var e in events){<option value="@(e?["id"]?.ToString())">@(e?["name"]?.ToString())</option>}</select></div>
+  <div><label class="form-label">Archivo</label><input type="file" name="file" accept=".csv,.geojson,.json" class="form-control" required /></div>
+  <button class="btn btn-primary">Procesar importación</button>
+</form></div>
+@if(report!=null){
+<div class="panel"><h4>Resultado de importación</h4><div class="row g-2 my-3"><div class="col-md-4"><div class="metric">Recibidas: <strong>@(report["received"])</strong></div></div><div class="col-md-4"><div class="metric">Aceptadas: <strong>@(report["accepted"])</strong></div></div><div class="col-md-4"><div class="metric">Rechazadas: <strong>@(report["rejected"])</strong></div></div></div>
+<table class="table"><thead><tr><th>Línea / feature</th><th>Motivo</th></tr></thead><tbody>
+@foreach(var err in (report["errors"] as JsonArray ?? new JsonArray())){<tr><td>@(err?["line"]?.ToString())</td><td>@(err?["reason"]?.ToString())</td></tr>}
+</tbody></table></div>
+}
