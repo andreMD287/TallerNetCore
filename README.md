@@ -11,7 +11,30 @@ Aplicación distribuida en 3 capas físicas sobre **.NET 10 (antes .NET Core)** 
 | — | `src/DisasterMaps.Simulator` (consola) | — | cliente REST (dispositivo de campo) |
 
 - Contratos: `contracts/protos/disaster_data.proto` (gRPC) y `contracts/rest/api-v1.md` (REST). Datos de ejemplo en `contracts/samples/`.
-- Documentación: `docs/ARQUITECTURA.md` y `docs/DECISIONS.md`.
+- Documentación: `docs/ARQUITECTURA.md`, `docs/DECISIONS.md` y `docs/VISUALIZACION.md`.
+- App móvil (Flutter, Android): `mobile/`.
+
+## Prueba rápida: sistema central y app móvil (APK)
+
+1. **Levantar el sistema central** (requiere Docker Desktop):
+   ```bash
+   docker compose up -d --build
+   ```
+   - Web: http://localhost:5001 (mapa de afectaciones y **Visualización** con los mapas de calor).
+   - Business: puerto **5002** (la app móvil se conecta aquí).
+2. **Instalar el APK** (`DisasterMaps-Campo.apk`) en un celular Android. Si Android lo pide, permitir la instalación desde esta fuente.
+3. **Conectar la app al sistema central:** el celular y el computador deben estar en la **misma red Wi-Fi**.
+   - En la app, abrir **Ajustes** y escribir `http://<IP del computador>:5002`. La IP se consulta en Windows con `ipconfig` (dirección IPv4 del adaptador Wi-Fi), por ejemplo `http://192.168.1.20:5002`.
+   - Pulsar **Guardar y probar conexión** y luego **Descargar eventos**.
+   - Si no conecta, permitir el puerto 5002 en el firewall de Windows (PowerShell como administrador):
+     ```powershell
+     New-NetFirewallRule -DisplayName "DisasterMaps 5002" -Direction Inbound -Protocol TCP -LocalPort 5002 -Action Allow
+     ```
+   - En el emulador de Android la dirección es `http://10.0.2.2:5002`.
+4. **Probar sin conexión:** activar el modo avión, registrar reportes en **Reportar** (latitud, longitud y nivel de afectación de 1 a 5) y verlos como *Pendiente* en **Reportes**.
+5. **Probar la sincronización:** desactivar el modo avión. En menos de un minuto los reportes pasan a *Sincronizado* y aparecen en http://localhost:5001 y en la pantalla **Visualización**.
+
+Más detalle de la app en `mobile/README.md`.
 
 ## Requisitos
 - SDK de .NET 10 (`dotnet --list-sdks`)
@@ -21,7 +44,7 @@ Aplicación distribuida en 3 capas físicas sobre **.NET 10 (antes .NET Core)** 
 ```bash
 docker compose up --build           # abre http://localhost:5001
 ```
-Solo la Web publica puerto. Para desarrollo (Business con Scalar en http://localhost:5002/scalar/v1 y Postgres en 5432):
+Publican puerto la Web (5001) y Business (5002, para la app móvil). Para desarrollo (Scalar en http://localhost:5002/scalar/v1 y Postgres en 5432):
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 ```
