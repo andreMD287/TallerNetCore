@@ -12,6 +12,7 @@
     ).addTo(map);
 
     let surface = L.layerGroup().addTo(map);
+    let currentData = null;
 
     const form = document.getElementById("visualForm");
     const status = document.getElementById("visualStatus");
@@ -20,7 +21,7 @@
     const eventSelect = document.getElementById("eventId");
 
     function parameters() {
-        return new URLSearchParams({
+        const query = new URLSearchParams({
             eventId: eventSelect.value,
             method: document.getElementById("method").value,
             metric: document.getElementById("metric").value,
@@ -28,6 +29,14 @@
             cellKm: "1",
             maxCells: "1200"
         });
+
+        const from = document.getElementById("dateFrom").value;
+        const to = document.getElementById("dateTo").value;
+
+        if (from) query.set("from", `${from}T00:00:00Z`);
+        if (to) query.set("to", `${to}T23:59:59Z`);
+
+        return query;
     }
 
     async function requestJson(url) {
@@ -54,6 +63,7 @@
     }
 
     function drawSurface(data) {
+        currentData = data;
         surface.clearLayers();
         legend.replaceChildren();
 
@@ -211,5 +221,76 @@
     document.getElementById("compareBtn")
         .addEventListener("click", compare);
 
+    function exportGeoJson() {
+        if (!currentData) {
+            status.textContent =
+                "Primero debes generar una superficie.";
+            return;
+        }
+
+        const grid = currentData.grid;
+        const features = [];
+
+        for (let row = 0; row < grid.rows; row++) {
+            for (let col = 0; col < grid.cols; col++) {
+                const value = grid.values[row][col];
+
+                if (value === null || !Number.isFinite(value))
+                    continue;
+
+                const south = grid.minLat + row * grid.stepLat;
+                const north = south + grid.stepLat;
+                const west = grid.minLon + col * grid.stepLon;
+                const east = west + grid.stepLon;
+
+                features.push({
+                    type: "Feature",
+                    geometry: {
+                        type: "Polygon",
+                        coordinates: [[
+                            [west, south],
+                            [east, south],
+                            [east, north],
+                            [west, north],
+                            [west, south]
+                        ]]
+                    },
+                    properties: {
+                        method: currentData.method,
+                        metric: currentData.metric,
+                        value,
+                        eventId: currentData.eventId,
+                        sampleCount: currentData.sampleCount
+                    }
+                });
+            }
+        }
+
+        const collection = {
+            type: "FeatureCollection",
+            features
+        };
+
+        const blob = new Blob(
+            [JSON.stringify(collection)],
+            { type: "application/geo+json" }
+        );
+
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+
+        link.href = url;
+        link.download =
+            `disastermaps-${currentData.method.toLowerCase()}.geojson`;
+
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    document.getElementById("exportGeoJsonBtn")
+        .addEventListener("click", exportGeoJson);
     loadEvents();
 })();

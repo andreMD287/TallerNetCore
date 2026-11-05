@@ -170,7 +170,7 @@ public sealed class VisualizationService(
         var t = thresholds.CurrentValue;
 
         return AffectationLevelClassifier.PeopleLevels(
-            Math.Max(0, t.Medium - 1),
+            t.Medium,
             t.High,
             t.Critical);
     }
