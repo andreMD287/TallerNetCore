@@ -15,7 +15,7 @@ using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ---- Logging estructurado: JSON por línea con TraceId/SpanId (decisión DEC-02) ----
+// ---- Logging estructurado: JSON por lÃ­nea con TraceId/SpanId (decisiÃ³n DEC-02) ----
 builder.Logging.ClearProviders();
 builder.Logging.AddJsonConsole(o =>
 {
@@ -30,7 +30,7 @@ builder.Logging.AddJsonConsole(o =>
 builder.Logging.Configure(o => o.ActivityTrackingOptions =
     ActivityTrackingOptions.TraceId | ActivityTrackingOptions.SpanId | ActivityTrackingOptions.ParentId);
 
-// ---- Configuración (equivalente a CDI/JNDI: direcciones y umbrales fuera del código) ----
+// ---- ConfiguraciÃ³n (equivalente a CDI/JNDI: direcciones y umbrales fuera del cÃ³digo) ----
 builder.Services.Configure<DataTierOptions>(builder.Configuration.GetSection(DataTierOptions.Section));
 builder.Services.Configure<SeverityThresholds>(builder.Configuration.GetSection(SeverityThresholds.Section));
 var dataTier = builder.Configuration.GetSection(DataTierOptions.Section).Get<DataTierOptions>() ?? new DataTierOptions();
@@ -49,7 +49,7 @@ else
     builder.Services.AddScoped<IDataGateway, GrpcDataGateway>();
 }
 
-// ---- Dominio, validación, importación y servicios de aplicación (sin estado) ----
+// ---- Dominio, validaciÃ³n, importaciÃ³n y servicios de aplicaciÃ³n (sin estado) ----
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<SeverityPolicy>();
 builder.Services.AddSingleton<CreateImpactValidator>();
@@ -60,18 +60,19 @@ builder.Services.AddSingleton<IImpactFileParser, GeoJsonImpactParser>();
 builder.Services.AddSingleton<ImportRowConverter>();
 builder.Services.AddScoped<EventService>();
 builder.Services.AddScoped<ImpactService>();
+builder.Services.AddScoped<DisasterMaps.Business.Visualization.VisualizationService>();
 builder.Services.AddScoped<ImportService>();
 
 // ---- API REST ----
 builder.Services.AddControllers(o =>
     {
         var m = o.ModelBindingMessageProvider;
-        m.SetValueIsInvalidAccessor(v => $"El valor '{v}' no es válido.");
-        m.SetAttemptedValueIsInvalidAccessor((v, f) => $"El valor '{v}' no es válido para {f}.");
+        m.SetValueIsInvalidAccessor(v => $"El valor '{v}' no es vÃ¡lido.");
+        m.SetAttemptedValueIsInvalidAccessor((v, f) => $"El valor '{v}' no es vÃ¡lido para {f}.");
         m.SetValueMustNotBeNullAccessor(f => $"El campo {f} es obligatorio.");
         m.SetMissingRequestBodyRequiredValueAccessor(() => "El cuerpo de la solicitud es obligatorio.");
-        m.SetNonPropertyAttemptedValueIsInvalidAccessor(v => $"El valor '{v}' no es válido.");
-        m.SetUnknownValueIsInvalidAccessor(f => $"El valor de {f} no es válido.");
+        m.SetNonPropertyAttemptedValueIsInvalidAccessor(v => $"El valor '{v}' no es vÃ¡lido.");
+        m.SetUnknownValueIsInvalidAccessor(f => $"El valor de {f} no es vÃ¡lido.");
     })
     .AddJsonOptions(o => JsonSetup.Configure(o.JsonSerializerOptions))
     .ConfigureApiBehaviorOptions(o => o.InvalidModelStateResponseFactory = InvalidModelState);
@@ -90,7 +91,7 @@ app.UseStatusCodePages();
 if (app.Environment.IsDevelopment() || app.Configuration.GetValue<bool>("OpenApi:Enabled"))
 {
     app.MapOpenApi();
-    app.MapScalarApiReference(o => o.WithTitle("DisasterMaps · Business API v1"));
+    app.MapScalarApiReference(o => o.WithTitle("DisasterMaps Â· Business API v1"));
 }
 
 app.MapControllers();
@@ -102,7 +103,7 @@ app.Logger.LogInformation("Business iniciado. Tier de Datos: {Mode} {Address}",
 
 app.Run();
 
-// Errores de binding/JSON → ValidationProblemDetails en español, con nombres de campo limpios.
+// Errores de binding/JSON â†’ ValidationProblemDetails en espaÃ±ol, con nombres de campo limpios.
 static IActionResult InvalidModelState(ActionContext ctx)
 {
     var errors = new Dictionary<string, string[]>();
@@ -112,20 +113,20 @@ static IActionResult InvalidModelState(ActionContext ctx)
         if (key.StartsWith("$.", StringComparison.Ordinal) || key == "$")
         {
             var field = key == "$" ? "body" : char.ToLowerInvariant(key[2]) + key[3..];
-            errors[field] = ["El valor no es válido o no tiene el formato esperado."];
+            errors[field] = ["El valor no es vÃ¡lido o no tiene el formato esperado."];
         }
         else
         {
             errors[string.IsNullOrEmpty(key) ? "body" : char.ToLowerInvariant(key[0]) + key[1..]] =
-                entry.Errors.Select(e => string.IsNullOrEmpty(e.ErrorMessage) ? "El valor no es válido." : e.ErrorMessage).ToArray();
+                entry.Errors.Select(e => string.IsNullOrEmpty(e.ErrorMessage) ? "El valor no es vÃ¡lido." : e.ErrorMessage).ToArray();
         }
     }
-    // Si el JSON era inválido, ASP.NET agrega además "request: obligatorio"; se omite si hay errores más precisos.
+    // Si el JSON era invÃ¡lido, ASP.NET agrega ademÃ¡s "request: obligatorio"; se omite si hay errores mÃ¡s precisos.
     if (errors.Count > 1) errors.Remove("request");
 
     var problem = new ValidationProblemDetails(errors)
     {
-        Title = "Uno o más campos no son válidos.",
+        Title = "Uno o mÃ¡s campos no son vÃ¡lidos.",
         Status = StatusCodes.Status400BadRequest,
         Extensions = { ["traceId"] = Activity.Current?.TraceId.ToString() ?? ctx.HttpContext.TraceIdentifier },
     };

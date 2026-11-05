@@ -55,7 +55,7 @@ public static class AffectationLevelClassifier
                 ToPeopleScale(highToCritical), "#f07835"),
             new("CRITICAL",
                 ToPeopleScale(highToCritical),
-                double.PositiveInfinity, "#d53745")
+                double.MaxValue, "#d53745")
         ];
     }
 }
