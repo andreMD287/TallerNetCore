@@ -1,0 +1,128 @@
+@{
+    ViewData["Title"] = "Visualización espacial";
+}
+
+@section Styles {
+    <link rel="stylesheet"
+          href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        #visualMap {
+            height: 560px;
+            width: 100%;
+            border-radius: 12px;
+            background: #e7edf1;
+        }
+        .visual-panel {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 20px;
+        }
+        .visual-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px;
+            margin-top: 12px;
+        }
+        .visual-legend span {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            font-size: 13px;
+        }
+        .visual-swatch {
+            width: 14px;
+            height: 14px;
+            border-radius: 3px;
+            display: inline-block;
+        }
+    </style>
+}
+
+<div class="mb-4">
+    <h1 class="h3 fw-bold">Visualización espacial</h1>
+    <p class="text-muted">
+        Interpolación de afectaciones por IDW, Kriging ordinario
+        y vecino más cercano.
+    </p>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-3">
+        <div class="visual-panel">
+            <form id="visualForm">
+                <div class="mb-3">
+                    <label for="eventId" class="form-label">Evento</label>
+                    <select id="eventId" class="form-select" required>
+                        <option value="">Cargando eventos...</option>
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label for="method" class="form-label">Método</label>
+                    <select id="method" class="form-select">
+                        <option value="IDW">IDW</option>
+                        <option value="NEAREST">Vecino más cercano</option>
+                        <option value="KRIGING">Kriging ordinario</option>
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label for="metric" class="form-label">Variable</label>
+                    <select id="metric" class="form-select">
+                        <option value="severity">Severidad</option>
+                        <option value="people">Personas afectadas</option>
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label for="radiusKm" class="form-label">
+                        Radio de búsqueda (km)
+                    </label>
+                    <input id="radiusKm" type="number"
+                           class="form-control"
+                           value="5" min="0.1" max="50" step="0.5" />
+                </div>
+
+                <button class="btn btn-primary w-100" type="submit">
+                    Generar superficie
+                </button>
+                <button class="btn btn-outline-secondary w-100 mt-2"
+                        id="compareBtn" type="button">
+                    Comparar métodos
+                </button>
+            </form>
+        </div>
+
+        <div class="visual-panel mt-3">
+            <h2 class="h6">Resultado</h2>
+            <div id="visualStatus" role="status">
+                Selecciona un evento para comenzar.
+            </div>
+            <div id="visualLegend" class="visual-legend"></div>
+        </div>
+
+        <div class="visual-panel mt-3">
+            <h2 class="h6">Validación cruzada</h2>
+            <div id="visualComparison" class="small text-muted">
+                Consulta la comparación de métodos.
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-9">
+        <div class="visual-panel">
+            <div id="visualMap"
+                 aria-label="Mapa de superficies interpoladas"></div>
+            <p class="text-muted small mt-3 mb-0">
+                Las superficies representan estimaciones espaciales.
+                No equivalen a mediciones directas en cada celda.
+            </p>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="~/js/visualizacion.js" asp-append-version="true"></script>
+}
