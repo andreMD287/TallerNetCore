@@ -5,6 +5,17 @@ public sealed record AffectationLevel(
 
 public static class AffectationLevelClassifier
 {
+    /// <summary>Nivel de afectación 1..5 capturado en campo (escala de verde a rojo).</summary>
+    public static readonly IReadOnlyList<AffectationLevel>
+        FieldLevels =
+        [
+            new("Nivel 1 · Mínima", 1.0, 1.5, "#38a169"),
+            new("Nivel 2 · Leve", 1.5, 2.5, "#9bc53d"),
+            new("Nivel 3 · Moderada", 2.5, 3.5, "#e5b135"),
+            new("Nivel 4 · Grave", 3.5, 4.5, "#f07835"),
+            new("Nivel 5 · Crítica", 4.5, 5.0, "#d53745")
+        ];
+
     public static readonly IReadOnlyList<AffectationLevel>
         SeverityLevels =
         [

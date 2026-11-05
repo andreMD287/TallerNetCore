@@ -11,7 +11,8 @@ public sealed class VisualizationRequest
     public DateTimeOffset? From { get; set; }
     public DateTimeOffset? To { get; set; }
     public string Method { get; set; } = "IDW";
-    public string Metric { get; set; } = "severity";
+    /// <summary>level (nivel de afectación 1..5, por defecto), severity o people.</summary>
+    public string Metric { get; set; } = "level";
     public double RadiusKm { get; set; } = 15;
     public double CellKm { get; set; } = 1;
     public int MaxCells { get; set; } = 2500;
@@ -36,6 +37,7 @@ public sealed class VisualizationService(
     IOptionsMonitor<SeverityThresholds> thresholds)
 {
     private const int MaxSamples = 500;
+    private const int MaxComparisonSamples = 100;
 
     public async Task<InterpolationResponse> InterpolateAsync(
         VisualizationRequest request, CancellationToken ct)
@@ -80,9 +82,15 @@ public sealed class VisualizationService(
 
         var samples = await LoadSamplesAsync(request, ct);
 
-        if (samples.Count > 100)
-            throw new ArgumentException(
-                "La comparacion permite hasta 100 muestras por consulta.");
+        // La validación cruzada de Kriging crece muy rápido con el número de puntos:
+        // con más de 100 se compara sobre una muestra uniforme y determinista de 100.
+        if (samples.Count > MaxComparisonSamples)
+        {
+            double step = (double)samples.Count / MaxComparisonSamples;
+            samples = Enumerable.Range(0, MaxComparisonSamples)
+                .Select(i => samples[(int)(i * step)])
+                .ToList();
+        }
 
         var parameters = new InterpolationParameters(
             Power: 2,
@@ -131,11 +139,12 @@ public sealed class VisualizationService(
 
             foreach (var item in result.Items)
             {
-                double value = request.Metric.Equals(
-                    "people", StringComparison.OrdinalIgnoreCase)
-                    ? AffectationLevelClassifier.ToPeopleScale(
-                        item.AffectedPeople)
-                    : (int)item.Severity;
+                double value =
+                    request.Metric.Equals("people", StringComparison.OrdinalIgnoreCase)
+                        ? AffectationLevelClassifier.ToPeopleScale(item.AffectedPeople)
+                    : request.Metric.Equals("severity", StringComparison.OrdinalIgnoreCase)
+                        ? (int)item.Severity
+                        : item.AffectationLevel;
 
                 if (!double.IsFinite(item.Latitude) ||
                     !double.IsFinite(item.Longitude) ||
@@ -164,6 +173,9 @@ public sealed class VisualizationService(
 
     private IReadOnlyList<AffectationLevel> GetLevels(string metric)
     {
+        if (metric.Equals("level", StringComparison.OrdinalIgnoreCase))
+            return AffectationLevelClassifier.FieldLevels;
+
         if (metric.Equals("severity", StringComparison.OrdinalIgnoreCase))
             return AffectationLevelClassifier.SeverityLevels;
 
@@ -201,7 +213,7 @@ public sealed class VisualizationService(
             throw new ArgumentException("Metodo invalido.");
 
         if (string.IsNullOrWhiteSpace(request.Metric) ||
-            !new[] { "severity", "people" }
+            !new[] { "level", "severity", "people" }
                 .Contains(request.Metric, StringComparer.OrdinalIgnoreCase))
             throw new ArgumentException("Metrica invalida.");
 
