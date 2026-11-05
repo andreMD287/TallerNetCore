@@ -254,7 +254,7 @@ sequenceDiagram
 | **D-07** Leaflet + OpenStreetMap | Sin costo ni API key; enunciado pide ubicar en mapa | Google Maps, Mapbox, OpenLayers | Leaflet 1.9 por CDN + tiles OSM con atribución. Ligero y suficiente para puntos. **Costo:** dependencia de un servicio externo de tiles. |
 | **D-08** Errores RFC 7807 en español | Usabilidad e interoperabilidad | Formato propio | `ProblemDetails` / `ValidationProblemDetails` con `errors` por campo y `traceId` para correlacionar con los logs. |
 
-El detalle de las decisiones menores está en `docs/DECISIONS.md` (R1-xx, R2-xx).
+El detalle de las decisiones menores está en `docs/DECISIONS.md` (DEC-xx).
 
 ## 6. Equivalencias con las lecturas (Jakarta EE → .NET)
 
@@ -280,8 +280,8 @@ El detalle de las decisiones menores está en `docs/DECISIONS.md` (R1-xx, R2-xx)
 
 | Atributo | Estímulo / entorno | Medida objetivo | Resultado medido |
 |---|---|---|---|
-| Rendimiento (mapa) | 2.000 afectaciones en BD, compose local | `GET /impacts/geojson` < 1 s; el mapa las pinta en < 2 s | _pendiente (Fase 2, con Data real)_ |
-| Rendimiento (importación) | CSV de 1.000 filas válidas | end-to-end < 3 s | _pendiente (Fase 2)_. Con el fake: 20 filas procesadas en Business en 15 ms |
+| Rendimiento (mapa) | 2.000 afectaciones en BD, compose local | `GET /impacts/geojson` < 1 s; el mapa las pinta en < 2 s | _pendiente: requiere el despliegue completo con PostgreSQL_ |
+| Rendimiento (importación) | CSV de 1.000 filas válidas | end-to-end < 3 s | _pendiente: requiere el despliegue completo con PostgreSQL_. Con el tier de Datos simulado: 20 filas procesadas en Business en 15 ms |
 | Disponibilidad / degradación | contenedor Data detenido | Business responde 503 en ≤ 3,5 s; la Web muestra un mensaje amigable; se recupera sin reiniciar | Prueba automática `DataTierDownTests`: **503 en ~3 s** con el cliente gRPC real contra un puerto cerrado. Recuperación en compose: _pendiente_ |
 | Modificabilidad | cambiar los umbrales de severidad | solo `appsettings`, sin recompilar | **Cumple:** `SeverityPolicy` lee `IOptionsMonitor<SeverityThresholds>` (prueba `Uses_current_thresholds_when_configuration_changes`) |
 

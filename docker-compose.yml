@@ -26,7 +26,7 @@ services:
       timeout: 3s
       retries: 20
 
-  data:                                   # Tier 3 (Rol 2): gRPC h2c en 5003
+  data:                                   # Tier 3 Datos: gRPC h2c en 5003
     build:
       context: .
       dockerfile: src/DisasterMaps.Data/Dockerfile
@@ -41,7 +41,7 @@ services:
       <<: *tcp-check
       test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/5003"]
 
-  business:                               # Tier 2 (Rol 1): REST /api/v1 en 5002
+  business:                               # Tier 2 Negocio: REST /api/v1 en 5002
     build:
       context: .
       dockerfile: src/DisasterMaps.Business/Dockerfile
@@ -57,7 +57,7 @@ services:
       <<: *tcp-check
       test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/5002 && printf 'GET /alive HTTP/1.0\r\n\r\n' >&3 && grep -q ' 200 ' <&3"]
 
-  web:                                    # Tier 1 (Rol 2): MVC + Leaflet en 5001
+  web:                                    # Tier 1 Presentación: MVC + Leaflet en 5001
     build:
       context: .
       dockerfile: src/DisasterMaps.Web/Dockerfile
@@ -75,7 +75,7 @@ services:
       <<: *tcp-check
       test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/5001"]
 
-  simulator:                              # Dispositivo de campo (Rol 1); solo con --profile tools
+  simulator:                              # Dispositivo de campo; solo con --profile tools
     profiles: ["tools"]
     build:
       context: .

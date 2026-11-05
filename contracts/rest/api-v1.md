@@ -1,6 +1,6 @@
 # Contrato REST v1 — Tier de Negocio (`DisasterMaps.Business`)
 
-> Contrato congelado v1. Dueño: Rol 1. Cualquier cambio se acuerda con Rol 2 antes del push.
+> Contrato v1 congelado: cualquier cambio debe acordarse antes de modificarlo, porque lo comparten los tiers de Presentación, Negocio y Datos.
 > Base local: `http://localhost:5002` · en compose: `http://business:5002`.
 
 ## 1. Endpoints `/api/v1`

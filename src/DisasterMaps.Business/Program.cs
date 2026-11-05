@@ -1,4 +1,4 @@
-// Tier 2 - Negocio (dueño: Rol 1). REST /api/v1 hacia arriba, gRPC hacia el tier de Datos.
+// Tier 2 - Negocio. REST /api/v1 hacia arriba, gRPC hacia el tier de Datos.
 using System.Diagnostics;
 using DisasterMaps.Business.Api;
 using DisasterMaps.Business.Application;
@@ -15,7 +15,7 @@ using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ---- Logging estructurado: JSON por línea con TraceId/SpanId (decisión R1-02) ----
+// ---- Logging estructurado: JSON por línea con TraceId/SpanId (decisión DEC-02) ----
 builder.Logging.ClearProviders();
 builder.Logging.AddJsonConsole(o =>
 {

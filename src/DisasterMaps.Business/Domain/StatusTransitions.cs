@@ -1,6 +1,6 @@
 namespace DisasterMaps.Business.Domain;
 
-/// <summary>RN-10: REPORTED → VERIFIED → ATTENDED, paso a paso y sin retroceder (decisión R1-03).</summary>
+/// <summary>RN-10: REPORTED → VERIFIED → ATTENDED, paso a paso y sin retroceder (decisión DEC-03).</summary>
 public static class StatusTransitions
 {
     public const ImpactStatus Initial = ImpactStatus.Reported;
