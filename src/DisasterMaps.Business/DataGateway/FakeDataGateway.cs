@@ -69,6 +69,42 @@ public sealed class FakeDataGateway : IDataGateway
         return Task.FromResult(impacts.Count);
     }
 
+    public Task<IngestResult> IngestImpactsBatchAsync(Guid batchId, IReadOnlyList<ImpactDto> impacts, IngestStrategy? strategy, int? chunkSize, CancellationToken ct)
+    {
+        var started = System.Diagnostics.Stopwatch.GetTimestamp();
+        var size = chunkSize is > 0 ? chunkSize.Value : 500;
+        var items = new List<IngestItem>(impacts.Count);
+        var chunks = 0;
+        lock (_batchLock)
+        {
+            foreach (var chunk in impacts.DistinctBy(i => i.Id).Chunk(size))
+            {
+                chunks++;
+                foreach (var i in chunk)
+                {
+                    if (_impacts.TryGetValue(i.Id, out var existing))
+                        items.Add(IsSameContent(existing.Impact, i)
+                            ? new IngestItem(i.Id, SyncItemStatus.Duplicate, null)
+                            : new IngestItem(i.Id, SyncItemStatus.Conflict, "Ya existe un registro con el mismo identificador y contenido distinto; no se sobrescribe."));
+                    else if (!_events.ContainsKey(i.EventId))
+                        items.Add(new IngestItem(i.Id, SyncItemStatus.Rejected, "El evento asociado no existe."));
+                    else
+                    {
+                        _impacts[i.Id] = (i with { ReceivedAt = DateTimeOffset.UtcNow }, false);
+                        items.Add(new IngestItem(i.Id, SyncItemStatus.Inserted, null));
+                    }
+                }
+            }
+        }
+        var elapsed = (long)System.Diagnostics.Stopwatch.GetElapsedTime(started).TotalMilliseconds;
+        return Task.FromResult(new IngestResult(items, strategy ?? IngestStrategy.Database, chunks, elapsed));
+    }
+
+    private static bool IsSameContent(ImpactDto a, ImpactDto b) =>
+        a.EventId == b.EventId && a.Latitude.Equals(b.Latitude) && a.Longitude.Equals(b.Longitude)
+        && a.AffectedPeople == b.AffectedPeople && a.AffectationLevel == b.AffectationLevel
+        && Math.Abs((a.ReportedAt - b.ReportedAt).TotalSeconds) < 1;
+
     public Task<ImpactDto> GetImpactAsync(Guid id, CancellationToken ct) => Task.FromResult(GetActive(id));
 
     public Task<PagedResult<ImpactDto>> ListImpactsAsync(ImpactQuery query, CancellationToken ct)

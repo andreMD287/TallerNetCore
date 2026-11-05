@@ -11,12 +11,26 @@ public sealed record CreateEventRequest(string? Name, EventType? Type, DateTimeO
 public sealed record ImpactDto(
     Guid Id, Guid EventId, double Latitude, double Longitude, Severity Severity, int AffectedPeople,
     string? Municipality, string? Department, string? Description, DateTimeOffset ReportedAt,
-    ImpactSource Source, ImpactStatus Status);
+    ImpactSource Source, ImpactStatus Status)
+{
+    /// <summary>Nivel 1..5. Si no se asigna, se deriva de la severidad (LOW=1 … CRITICAL=4).</summary>
+    public int AffectationLevel { get; init; } = AffectationLevels.FromSeverity(Severity);
+
+    /// <summary>Dispositivo que capturó el reporte (solo reportes MOBILE).</summary>
+    public string? DeviceId { get; init; }
+
+    /// <summary>Cuándo lo incorporó la plataforma (T_sys). reportedAt es cuándo ocurrió (T_eff).</summary>
+    public DateTimeOffset? ReceivedAt { get; init; }
+}
 
 public record CreateImpactRequest(
     Guid? EventId, double? Latitude, double? Longitude, Severity? Severity, int? AffectedPeople,
     string? Municipality, string? Department, string? Description, DateTimeOffset? ReportedAt,
-    ImpactSource? Source);
+    ImpactSource? Source)
+{
+    /// <summary>Nivel de afectación 1..5 (opcional). Si viene sin severidad, la severidad se deriva de él.</summary>
+    public int? AffectationLevel { get; init; }
+}
 
 public sealed record UpdateImpactRequest(
     Guid? EventId, double? Latitude, double? Longitude, Severity? Severity, int? AffectedPeople,

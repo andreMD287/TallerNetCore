@@ -61,6 +61,8 @@ builder.Services.AddSingleton<ImportRowConverter>();
 builder.Services.AddScoped<EventService>();
 builder.Services.AddScoped<ImpactService>();
 builder.Services.AddScoped<ImportService>();
+builder.Services.Configure<SyncOptions>(builder.Configuration.GetSection(SyncOptions.Section));
+builder.Services.AddScoped<SyncService>();
 
 // ---- API REST ----
 builder.Services.AddControllers(o =>

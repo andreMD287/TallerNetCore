@@ -5,7 +5,8 @@ namespace DisasterMaps.Business.DataGateway;
 
 /// <summary>
 /// Reintento automático (máx. 3 intentos, backoff 0,2 s → 1 s, solo ante UNAVAILABLE) únicamente
-/// en operaciones idempotentes: lecturas y CreateImpact (el id lo genera Business).
+/// en operaciones idempotentes: lecturas, CreateImpact (el id lo genera Business) e IngestImpactsBatch
+/// (el id lo genera el dispositivo y un reenvío se clasifica como DUPLICATE).
 /// CreateImpactsBatch, UpdateImpact y DeleteImpact no se reintentan.
 /// </summary>
 public static class GrpcRetryPolicy
@@ -13,7 +14,7 @@ public static class GrpcRetryPolicy
     public const string Service = "disastermaps.data.v1.DisasterData";
 
     public static readonly string[] IdempotentMethods =
-        ["ListEvents", "GetImpact", "ListImpacts", "SummaryByMunicipality", "CreateImpact"];
+        ["ListEvents", "GetImpact", "ListImpacts", "SummaryByMunicipality", "CreateImpact", "IngestImpactsBatch"];
 
     public static ServiceConfig Create()
     {

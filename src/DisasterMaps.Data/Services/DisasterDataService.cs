@@ -1,6 +1,7 @@
 using Enum = System.Enum;
 using DisasterMaps.Contracts.Data.V1;
 using DisasterMaps.Data.Entities;
+using DisasterMaps.Data.Ingestion;
 using DisasterMaps.Data.Persistence;
 using DisasterMaps.Data.Repositories;
 using Google.Protobuf.WellKnownTypes;
@@ -13,7 +14,7 @@ using ProtoImpact = DisasterMaps.Contracts.Data.V1.Impact;
 namespace DisasterMaps.Data.Services;
 
 public sealed class DisasterDataService(
-    DisasterMapsDbContext db, ImpactBulkWriter bulkWriter, ILogger<DisasterDataService> logger)
+    DisasterMapsDbContext db, ImpactBulkWriter bulkWriter, ImpactIngestor ingestor, ILogger<DisasterDataService> logger)
     : DisasterData.DisasterDataBase
 {
     private static RpcException Fail(StatusCode code, string message) => new(new Status(code, message));
@@ -38,7 +39,9 @@ public sealed class DisasterDataService(
         AffectedPeople = i.AffectedPeople, Municipality = i.Municipality,
         Department = i.Department, Description = i.Description,
         ReportedAt = Date(i.ReportedAt), Source = i.Source.ToString().ToUpperInvariant(),
-        Status = i.Status.ToString().ToUpperInvariant()
+        Status = i.Status.ToString().ToUpperInvariant(),
+        AffectationLevel = ImpactBulkWriter.LevelOf(i),
+        DeviceId = string.IsNullOrEmpty(i.DeviceId) ? null : i.DeviceId
     };
     private static ProtoEvent ToProto(DisasterEventEntity e) => new()
     {
@@ -52,21 +55,12 @@ public sealed class DisasterDataService(
         Longitude = i.Longitude, Severity = Enum.Parse<Severity>(i.Severity, true),
         AffectedPeople = i.AffectedPeople, Municipality = i.Municipality,
         Department = i.Department, Description = i.Description, ReportedAt = Stamp(i.ReportedAt),
-        Source = Enum.Parse<ImpactSource>(i.Source, true), Status = Enum.Parse<ImpactStatus>(i.Status, true)
+        Source = Enum.Parse<ImpactSource>(i.Source, true), Status = Enum.Parse<ImpactStatus>(i.Status, true),
+        AffectationLevel = i.AffectationLevel, DeviceId = i.DeviceId ?? "", ReceivedAt = Stamp(i.ReceivedAt)
     };
     private static void Validate(ProtoImpact i)
     {
-        if (i is null) throw Fail(StatusCode.InvalidArgument, "Falta la afectación.");
-        ParseId(i.Id);
-        ParseId(i.EventId);
-        if (!double.IsFinite(i.Latitude) || !double.IsFinite(i.Longitude)
-            || i.Latitude < -90 || i.Latitude > 90 || i.Longitude < -180 || i.Longitude > 180
-            || (i.Latitude == 0 && i.Longitude == 0))
-            throw Fail(StatusCode.InvalidArgument, "Coordenadas inválidas.");
-        if (i.AffectedPeople < 0 || (int)i.Severity < 1 || (int)i.Severity > 4
-            || (int)i.Source < 1 || (int)i.Source > 3 || (int)i.Status < 1 || (int)i.Status > 3)
-            throw Fail(StatusCode.InvalidArgument, "Severidad, fuente, estado o personas afectadas inválidos.");
-        if (i.ReportedAt is null) throw Fail(StatusCode.InvalidArgument, "Falta reported_at.");
+        if (ImpactValidation.Check(i) is { } error) throw Fail(StatusCode.InvalidArgument, error);
     }
     private static RpcException ConvertError(Exception ex)
     {
@@ -167,6 +161,8 @@ public sealed class DisasterDataService(
         int inserted = await bulkWriter.WriteAsync(request.Impacts, context.CancellationToken);
         return new BatchReply { Inserted = inserted };
     });
+    public override Task<IngestBatchReply> IngestImpactsBatch(IngestBatchRequest request, ServerCallContext context) =>
+        Execute(context, () => ingestor.IngestAsync(request, context.CancellationToken));
     public override Task<ImpactReply> GetImpact(GetByIdRequest request, ServerCallContext context) => Execute(context, async () =>
     {
         var id = ParseId(request.Id);
@@ -200,6 +196,7 @@ public sealed class DisasterDataService(
         item.AffectedPeople = replacement.AffectedPeople; item.Municipality = replacement.Municipality;
         item.Department = replacement.Department; item.Description = replacement.Description;
         item.ReportedAt = replacement.ReportedAt; item.Source = replacement.Source; item.Status = replacement.Status;
+        item.AffectationLevel = replacement.AffectationLevel;
         await db.SaveChangesAsync(context.CancellationToken);
         return new ImpactReply { Impact = ToProto(item) };
     });

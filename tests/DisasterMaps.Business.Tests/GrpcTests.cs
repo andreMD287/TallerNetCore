@@ -41,7 +41,7 @@ public class GrpcRetryPolicyTests
         var config = GrpcRetryPolicy.Create().MethodConfigs.Single();
         var methods = config.Names.Select(n => n.Method).ToHashSet();
 
-        Assert.Equal(["CreateImpact", "GetImpact", "ListEvents", "ListImpacts", "SummaryByMunicipality"], methods.Order());
+        Assert.Equal(["CreateImpact", "GetImpact", "IngestImpactsBatch", "ListEvents", "ListImpacts", "SummaryByMunicipality"], methods.Order());
         Assert.DoesNotContain("CreateImpactsBatch", methods);
         Assert.DoesNotContain("UpdateImpact", methods);
         Assert.DoesNotContain("DeleteImpact", methods);

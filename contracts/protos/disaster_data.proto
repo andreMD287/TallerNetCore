@@ -17,11 +17,15 @@ service DisasterData {
   rpc UpdateImpact (UpdateImpactRequest) returns (ImpactReply);
   rpc DeleteImpact (GetByIdRequest) returns (DeleteReply);
   rpc SummaryByMunicipality (ImpactFilter) returns (SummaryReply);
+
+  // Carga por lotes de reportes capturados sin conexión (app móvil). No es atómica:
+  // responde un resultado por registro y nunca sobrescribe un registro existente.
+  rpc IngestImpactsBatch (IngestBatchRequest) returns (IngestBatchReply);
 }
 
 enum EventType { EVENT_TYPE_UNSPECIFIED = 0; FLOOD = 1; LANDSLIDE = 2; EARTHQUAKE = 3; WILDFIRE = 4; WINDSTORM = 5; OTHER = 6; }
 enum Severity { SEVERITY_UNSPECIFIED = 0; LOW = 1; MEDIUM = 2; HIGH = 3; CRITICAL = 4; }
-enum ImpactSource { IMPACT_SOURCE_UNSPECIFIED = 0; MANUAL = 1; FILE = 2; DEVICE = 3; }
+enum ImpactSource { IMPACT_SOURCE_UNSPECIFIED = 0; MANUAL = 1; FILE = 2; DEVICE = 3; MOBILE = 4; }
 enum ImpactStatus { IMPACT_STATUS_UNSPECIFIED = 0; REPORTED = 1; VERIFIED = 2; ATTENDED = 3; }
 
 message DisasterEvent {
@@ -45,6 +49,9 @@ message Impact {
   google.protobuf.Timestamp reported_at = 10; // UTC
   ImpactSource source = 11;
   ImpactStatus status = 12;
+  string device_id = 13;                      // dispositivo que capturó el reporte (vacío si no aplica)
+  google.protobuf.Timestamp received_at = 14; // cuándo lo incorporó la plataforma (lo asigna Data; se ignora al insertar)
+  int32 affectation_level = 15;               // nivel de afectación 1..5 (0 = derivar de la severidad)
 }
 
 message CreateEventRequest { DisasterEvent event = 1; }
@@ -83,3 +90,27 @@ message MunicipalitySummary {
   Severity max_severity = 5;
 }
 message SummaryReply { repeated MunicipalitySummary items = 1; }
+
+// ---- Carga por lotes (módulo de operación desconectada) ----
+// DAL: el tier de Datos clasifica en C# (LINQ) e inserta con COPY.
+// DATABASE: COPY a una tabla intermedia y una función de PostgreSQL clasifica e inserta.
+enum IngestStrategy { INGEST_STRATEGY_UNSPECIFIED = 0; DAL = 1; DATABASE = 2; }  // UNSPECIFIED = la configurada en Data
+enum IngestOutcome { INGEST_OUTCOME_UNSPECIFIED = 0; INSERTED = 1; DUPLICATE = 2; CONFLICT = 3; REJECTED = 4; }
+
+message IngestBatchRequest {
+  string batch_id = 1;                 // UUID del lote, solo para trazabilidad
+  repeated Impact impacts = 2;         // el id de cada uno lo generó el dispositivo
+  IngestStrategy strategy = 3;
+  int32 chunk_size = 4;                // registros por transacción; 0 = el configurado en Data
+}
+message IngestItemResult {
+  string id = 1;
+  IngestOutcome outcome = 2;
+  string reason = 3;                   // vacío si INSERTED
+}
+message IngestBatchReply {
+  repeated IngestItemResult results = 1;
+  IngestStrategy strategy = 2;         // la que se usó realmente
+  int32 chunks = 3;
+  int64 elapsed_ms = 4;
+}

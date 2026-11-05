@@ -1,4 +1,5 @@
-# DisasterMaps: 3 tiers físicos + EIS. Modo demo: solo la Web publica puerto al host.
+# DisasterMaps: 3 tiers físicos + EIS. Modo demo: la Web (5001) y Business (5002, para la app móvil)
+# publican puerto al host.
 #   docker compose up --build            -> http://localhost:5001
 #   docker compose --profile tools run --rm simulator --event-id <uuid> --count 20 --interval 2
 # Modo dev (además publica Business 5002 con Scalar y Postgres 5432):
@@ -50,6 +51,8 @@ services:
       DataTier__UseFake: "false"
       DataTier__Address: http://data:5003
       DataTier__DeadlineSeconds: "3"
+    ports:
+      - "5002:5002"                       # la app móvil sincroniza por REST desde la red local
     depends_on:
       data:
         condition: service_healthy

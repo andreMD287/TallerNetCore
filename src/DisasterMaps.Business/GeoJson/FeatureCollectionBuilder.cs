@@ -11,7 +11,8 @@ public sealed record PointGeometry(double[] Coordinates)
 
 public sealed record FeatureProperties(
     Guid Id, Guid EventId, Severity Severity, int AffectedPeople, string? Municipality, string? Department,
-    string? Description, DateTimeOffset ReportedAt, ImpactSource Source, ImpactStatus Status);
+    string? Description, DateTimeOffset ReportedAt, ImpactSource Source, ImpactStatus Status,
+    int AffectationLevel, DateTimeOffset? ReceivedAt);
 
 public sealed record Feature(PointGeometry Geometry, FeatureProperties Properties)
 {
@@ -34,5 +35,5 @@ public static class FeatureCollectionBuilder
     public static Feature ToFeature(ImpactDto i) => new(
         new PointGeometry([i.Longitude, i.Latitude]),
         new FeatureProperties(i.Id, i.EventId, i.Severity, i.AffectedPeople, i.Municipality, i.Department,
-            i.Description, i.ReportedAt, i.Source, i.Status));
+            i.Description, i.ReportedAt, i.Source, i.Status, i.AffectationLevel, i.ReceivedAt));
 }

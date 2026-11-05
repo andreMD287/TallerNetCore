@@ -64,3 +64,32 @@ GET {{base}}/api/v1/stats/by-municipality?eventId={{eventId}}
 
 ### Borrado lógico
 DELETE {{base}}/api/v1/impacts/{{created.response.body.id}}
+
+### Sincronización de la app móvil (lote capturado sin conexión). Reenviarlo devuelve DUPLICATE.
+POST {{base}}/api/v1/sync/batch
+Content-Type: application/json
+
+{
+  "batchId": "{{$guid}}",
+  "deviceId": "android-ejemplo",
+  "items": [
+    { "clientId": "{{$guid}}", "eventId": "{{eventId}}", "latitude": 1.1531, "longitude": -76.6481,
+      "affectationLevel": 5, "affectedPeople": 40, "municipality": "Mocoa", "department": "Putumayo",
+      "description": "Vivienda colapsada", "reportedAt": "2026-11-05T09:12:44Z" },
+    { "clientId": "{{$guid}}", "eventId": "{{eventId}}", "latitude": 1.1490, "longitude": -76.6510,
+      "affectationLevel": 2, "reportedAt": "2026-11-05T09:20:00Z" }
+  ]
+}
+
+### Misma carga forzando la estrategia de la base de datos y paquetes de 1 registro
+POST {{base}}/api/v1/sync/batch?strategy=DATABASE&chunkSize=1
+Content-Type: application/json
+
+{
+  "batchId": "{{$guid}}",
+  "deviceId": "android-ejemplo",
+  "items": [
+    { "clientId": "{{$guid}}", "eventId": "{{eventId}}", "latitude": 1.1555, "longitude": -76.6433,
+      "affectationLevel": 3, "reportedAt": "2026-11-05T09:30:00Z" }
+  ]
+}

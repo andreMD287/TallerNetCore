@@ -12,6 +12,7 @@ Taller de Arquitectura de Software (PUJ, 2026-30). Implementación en **.NET 10 
 | **Leer** coordenadas | Importación de archivos CSV y GeoJSON (`POST /api/v1/impacts/import`) |
 | **Recibir** coordenadas | `POST /api/v1/impacts` desde el formulario o desde un dispositivo (simulador) |
 | **Trazar / ubicar** en un mapa | Mapa Leaflet + OpenStreetMap con marcadores por severidad, filtros y popups |
+| **Recolectar** latitud, longitud y nivel de afectación (1 a 5) **sin conexión** y **sincronizar** al recuperarla | App móvil Flutter con SQLite local + `POST /api/v1/sync/batch` + carga por lotes en Data (sección 10) |
 
 Temas del tablero evidenciados: **ADO.NET, LINQ y Entity Framework** (tier de Datos, sección 3.4) y una arquitectura **3-tier distribuida** con **REST** y **gRPC** (secciones 3 y 5).
 
@@ -21,13 +22,16 @@ Temas del tablero evidenciados: **ADO.NET, LINQ y Entity Framework** (tier de Da
 flowchart LR
   OP([Operador]) -- navegador HTTP --> SYS[DisasterMaps]
   DEV([Dispositivo de campo / Simulador]) -- REST JSON --> SYS
+  APP([Evaluador de campo con la app móvil]) -- REST JSON al recuperar conexión --> SYS
   SYS -- tiles del mapa vía navegador --> OSM[(OpenStreetMap)]
+  APP -- tiles del mapa cuando hay red --> OSM
 ```
 
 | Actor / sistema | Interacción |
 |---|---|
 | Operador | Consulta el mapa, registra afectaciones (clic en el mapa), importa archivos, cambia estados, ve el resumen por municipio |
 | Dispositivo / simulador | Envía afectaciones por REST con `source = DEVICE` |
+| Evaluador de campo (app móvil) | Captura posición y nivel de afectación sin conexión; la app sincroniza por lotes con `source = MOBILE` (sección 10) |
 | OpenStreetMap | Sistema externo: provee las teselas del mapa (sin API key, con atribución) |
 
 ## 3. Vistas de componentes y despliegue
@@ -289,7 +293,7 @@ Cómo medir: ver la sección "Medir las metas" del `README.md`.
 
 ## 8. Diferidos (fuera de alcance, con justificación)
 
-- **Seguridad (autenticación y autorización):** el enunciado no la pide. Mitigación mínima: solo la Web publica puerto; Business y Data quedan en la red interna de Docker.
+- **Seguridad (autenticación y autorización):** el enunciado no la pide. Mitigación mínima: solo publican puerto la Web y Business (este último para la app móvil, DEC-16); Data y PostgreSQL quedan en la red interna de Docker.
 - **PostGIS / consultas espaciales:** lat/lon como `double` + índice compuesto bastan para filtrar por bbox con el volumen del taller (miles de puntos).
 - **Mensajería asíncrona (estilo JMS / RabbitMQ)** para dispositivos de campo: la ingesta es síncrona por REST; una cola desacoplaría los picos de reportes y es la extensión natural (equivalente a un Message-Driven Bean).
 - **Polígonos de zonas afectadas:** solo puntos; usar GeoJSON deja la puerta abierta.
@@ -311,3 +315,157 @@ dotnet test DisasterMaps.sln
 ```
 
 Más detalle (ejecución de cada tier por separado y guion de demo) en el `README.md`.
+
+## 10. Módulo de operación desconectada (app móvil)
+
+> **Enunciado.** Crear una aplicación móvil que permita recolectar información de posición (latitud y longitud) y el nivel de afectación (1, 2, 3, 4 o 5) de los sitios de desastre. La aplicación debe funcionar de manera desconectada cuando no se cuente con acceso a internet. Una vez se pueda reestablecer la comunicación, se debe sincronizar la información en el sistema central.
+
+Trazabilidad con el SRS del proyecto: RF-ED-11 (descargar antes la información para operar sin conexión), RF-ED-12 (registrar sin conexión y guardar en el dispositivo), RF-ED-13 (sincronizar al recuperar la conexión, contemplando conflictos), CON-13 (apps móviles funcionan parcialmente sin conexión), CRN-01 (operación desconectada y reconciliación) y QA-REC-02 (no perder lo capturado localmente).
+
+### 10.1 Drivers y escenarios de calidad
+
+| ID | Fuente → estímulo | Respuesta esperada | Medida | Cómo se cumple |
+|---|---|---|---|---|
+| ESC-M1 (QA-REC-02) | Evaluador sin señal guarda 50 reportes y el sistema central está caído | Nada se pierde; todo queda identificable como pendiente | 0 reportes perdidos | SQLite local como fuente de verdad. Solo se marca "Sincronizado" con confirmación del servidor (DEC-15). Prueba `sin conexión no se pierde nada` |
+| ESC-M2 (CRN-01-01) | Vuelve la señal con reportes pendientes | Se envían sin intervención del usuario | Inicio ≤ 1 min tras recuperar la red | Escucha de conectividad + temporizador de 1 min + reintento con espera creciente |
+| ESC-M3 (idempotencia) | Se pierde la respuesta de un envío y la app reenvía el lote | No hay duplicados en el sistema central | 0 duplicados | `clientId` generado en el teléfono = id definitivo; reenvío → DUPLICATE (DEC-11) |
+| ESC-M4 (integridad) | Llega un reporte con el mismo id y otro contenido | No se sobrescribe; queda explícito | 0 sobrescrituras silenciosas | `CONFLICT` en ambas estrategias de carga (SAD 4.8, punto 6) |
+| ESC-M5 (rendimiento de la carga) | Llega un lote de 10.000 reportes | Se carga completo | < 2 s en el tier de Datos | **1,2 s** con la estrategia DATABASE (DEC-10) |
+| ESC-M6 (usabilidad en campo) | El evaluador no sabe si hay conexión | Siempre ve el estado y cuántos reportes faltan | Visible en todas las pantallas | Franja de conexión arriba + contador en la pestaña "Reportes" |
+
+### 10.2 Vista de componentes
+
+```mermaid
+flowchart LR
+  subgraph Phone[Teléfono Android · app Flutter]
+    UI[Pantallas: Reportar · Reportes · Mapa · Ajustes] --> ST[AppState]
+    ST --> REPO[ReportRepository]
+    REPO --> SQL[(SQLite: reports, events)]
+    ST --> ENG[SyncEngine]
+    ENG --> REPO
+    ENG --> API[DisasterApi · cliente REST]
+    NET[connectivity_plus] -. red recuperada .-> ST
+    GPS[geolocator · GPS sin red] --> UI
+  end
+  API -- "POST /api/v1/sync/batch (REST JSON)" --> SC[SyncController]
+  subgraph Business[Tier 2 · Business]
+    SC --> SS[SyncService · valida RN-01/03/05 y nivel 1..5]
+    SS --> GW[[IDataGateway]]
+  end
+  GW -- "gRPC IngestImpactsBatch" --> ING
+  subgraph Data[Tier 3 · Data]
+    ING[ImpactIngestor · valida, parte en paquetes, elige estrategia] --> DAL[DalIngestionStrategy · LINQ + COPY]
+    ING --> DBS[DatabaseIngestionStrategy · COPY a staging + función]
+  end
+  DAL --> PG[(PostgreSQL · impacts)]
+  DBS --> STG[(impacts_staging UNLOGGED)] --> FN[[ingest_impacts_from_staging]] --> PG
+```
+
+| Elemento | Responsabilidad |
+|---|---|
+| `SQLite` (teléfono) | Fuente de verdad mientras no hay red. Guarda reportes con su estado (`PENDING`, `SYNCED`, `CONFLICT`, `REJECTED`), intentos, último error y próxima hora de reintento, más los eventos descargados (RF-ED-11) |
+| `SyncEngine` | Envía los pendientes en lotes de 25 a 500 registros (configurable), aplica la respuesta por registro y programa la espera ante fallos. Nunca borra un reporte no confirmado |
+| `SyncService` (Business) | Valida forma del lote (400) y reglas por registro (rechazo individual). Asigna `source = MOBILE`, deriva la severidad del nivel (DEC-13) y arma el `SyncReport` |
+| `ImpactIngestor` (Data) | Red de seguridad de validación, partición en paquetes transaccionales y elección DAL/DATABASE (DEC-10, DEC-12) |
+
+### 10.3 Vista de despliegue
+
+```mermaid
+flowchart LR
+  subgraph Campo[Zona del desastre]
+    T1[Teléfono 1 · APK]
+    T2[Teléfono N · APK]
+  end
+  subgraph Host[Servidor · Docker Compose]
+    W[web :5001]
+    B[business :5002]
+    D[data :5003]
+    P[(postgres :5432)]
+  end
+  T1 -- "HTTP :5002 (Wi-Fi o datos, cuando hay)" --> B
+  T2 -- "HTTP :5002" --> B
+  W --> B --> D --> P
+```
+
+Business publica 5002 para los teléfonos (DEC-16). En el emulador de Android la dirección es `http://10.0.2.2:5002`; en un teléfono real, `http://<IP del servidor>:5002` en la misma red.
+
+### 10.4 Ciclo de vida de un reporte en el teléfono
+
+```mermaid
+stateDiagram-v2
+  [*] --> PENDING: Guardar (siempre local primero)
+  PENDING --> PENDING: sin red / 503 / timeout\n(intentos+1, espera 30 s → 15 min)
+  PENDING --> SYNCED: INSERTED o DUPLICATE
+  PENDING --> REJECTED: REJECTED (errores por campo)
+  PENDING --> CONFLICT: CONFLICT (mismo id, otro contenido)
+  REJECTED --> PENDING: Corregir y reenviar (mismo id)
+  CONFLICT --> PENDING: Enviar como reporte nuevo (id nuevo)
+  REJECTED --> [*]: Eliminar del teléfono
+  CONFLICT --> [*]: Descartar
+  SYNCED --> [*]: Quitar del teléfono (el dato ya está en el sistema central)
+```
+
+### 10.5 Secuencia: capturar sin conexión y sincronizar al volver la señal
+
+```mermaid
+sequenceDiagram
+  actor E as Evaluador
+  participant A as App (SQLite)
+  participant B as Business
+  participant D as Data
+  participant P as PostgreSQL
+  Note over A: Sin conexión
+  E->>A: GPS + nivel 4 + Guardar
+  A->>A: INSERT reports (PENDING, clientId = UUID v7)
+  A-->>E: "Guardado en el teléfono"
+  Note over A: Vuelve la red (connectivity_plus)
+  A->>B: GET /health
+  B-->>A: 200
+  A->>B: POST /api/v1/sync/batch {batchId, deviceId, items[≤100]}
+  B->>B: valida cada registro (RN-01, 03, 05, nivel 1..5)
+  B->>D: gRPC IngestImpactsBatch (solo válidos)
+  D->>D: < 2000 → DAL · ≥ 2000 → DATABASE
+  D->>P: SELECT ids/eventos existentes (LINQ)
+  D->>P: COPY nuevos (una transacción por paquete)
+  D-->>B: resultado por registro
+  B-->>A: 200 SyncReport (INSERTED/DUPLICATE/CONFLICT/REJECTED)
+  A->>A: UPDATE status en una transacción
+  A-->>E: Franja: "Conectado: todo está sincronizado"
+```
+
+Si la respuesta se pierde, el siguiente intento reenvía los mismos `clientId`. Data responde DUPLICATE y la app los marca como sincronizados (ESC-M3).
+
+### 10.6 Carga por lotes: DAL frente a base de datos
+
+| | DAL (`DalIngestionStrategy`) | Base de datos (`DatabaseIngestionStrategy`) |
+|---|---|---|
+| Quién clasifica | C# con LINQ sobre EF Core | Función PL/pgSQL `ingest_impacts_from_staging` |
+| Cómo inserta | `COPY` binario a `impacts` | `COPY` a `impacts_staging` (UNLOGGED) + `INSERT … SELECT … ON CONFLICT DO NOTHING` |
+| Transacción | Lectura e inserción separadas; ante una violación de PK, reclasifica el paquete una vez | Clasificación e inserción en la misma sentencia |
+| Mejor con | Lotes pequeños: 100 registros en 16 ms frente a 46 ms | Lotes grandes: 10.000 registros en 1,2 s frente a 1,6 s |
+| Tecnologías del tablero | LINQ + Entity Framework + ADO.NET | ADO.NET + SQL del motor |
+
+Las dos estrategias conviven y `ImpactIngestor` elige por tamaño (umbral 2.000, configurable). La medición completa y la decisión están en DEC-10, y se reproducen con `scripts/benchmark-ingesta.ps1`.
+
+### 10.7 Modelo de datos agregado
+
+- `impacts.affectation_level smallint NOT NULL CHECK (1..5)`: nivel capturado (DEC-13).
+- `impacts.device_id varchar(64)`: teléfono que capturó el reporte.
+- `impacts.received_at timestamptz DEFAULT now()`: cuándo lo incorporó la plataforma (T_sys). `reported_at` sigue siendo cuándo ocurrió (T_eff). Así se distinguen las dos preguntas del SAD 4.10: qué pasó en un instante y qué sabía la plataforma en ese instante.
+- `impacts_staging` (UNLOGGED) y la función `ingest_impacts_from_staging(uuid)`: solo para la estrategia DATABASE.
+
+Migración: `20261105120000_MobileSyncIngestion`.
+
+### 10.8 Cómo probar el módulo
+
+```bash
+docker compose up -d --build                     # Business queda en :5002 para la app
+cd mobile && flutter test                        # 13 pruebas de la app (sincronización, coordenadas, modelo)
+flutter build apk --release                      # build/app/outputs/flutter-apk/app-release.apk
+pwsh scripts/benchmark-ingesta.ps1               # compara DAL y DATABASE contra PostgreSQL
+```
+
+Guion de demostración:
+1. Instale el APK y, en Ajustes, ponga la dirección del servidor y descargue los eventos.
+2. Active el modo avión y registre varios reportes con GPS o tocando el mapa. La franja dice "Sin conexión" y el contador de pendientes sube.
+3. Desactive el modo avión. En menos de un minuto los reportes pasan a "Sincronizado" y aparecen en el mapa web con `source = MOBILE`.

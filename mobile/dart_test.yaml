@@ -1,0 +1,3 @@
+tags:
+  servidor:
+    # Pruebas contra el sistema central real; se activan con --dart-define=SERVER_URL=...

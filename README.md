@@ -49,6 +49,15 @@ dotnet run --project src/DisasterMaps.Simulator -- --event-id <uuid> --count 20 
 docker compose --profile tools run --rm simulator --event-id <uuid> --count 20 --interval 2
 ```
 
+## App móvil (operación desconectada)
+App Flutter en `mobile/`. Captura latitud, longitud y nivel de afectación (1 a 5) sin conexión, y sincroniza con `POST /api/v1/sync/batch` al recuperarla. Instalación y guion de prueba en `mobile/README.md`; diseño en la sección 10 de `docs/ARQUITECTURA.md`.
+
+```bash
+cd mobile && flutter test && flutter build apk --release
+# Comparar las dos estrategias de carga por lotes (DAL y base de datos) contra PostgreSQL:
+pwsh scripts/benchmark-ingesta.ps1
+```
+
 ## Pruebas
 ```bash
 dotnet test DisasterMaps.sln

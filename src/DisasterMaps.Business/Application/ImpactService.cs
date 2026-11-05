@@ -35,17 +35,21 @@ public sealed class ImpactService(
         createValidator.Validate(request).ThrowIfInvalid();
 
         var affected = request.AffectedPeople ?? 0;
+        var severity = ResolveSeverity(request, affected);
         var impact = new ImpactDto(
             Guid.CreateVersion7(), // id generado en Business => CreateImpact idempotente
             request.EventId!.Value,
             ImpactRules.RoundCoordinate(request.Latitude!.Value),
             ImpactRules.RoundCoordinate(request.Longitude!.Value),
-            severityPolicy.Resolve(request.Severity, affected),
+            severity,
             affected,
             Clean(request.Municipality), Clean(request.Department), Clean(request.Description),
             (request.ReportedAt ?? clock.GetUtcNow()).ToUniversalTime(),
             ResolveSource(request.Source),
-            StatusTransitions.Initial);
+            StatusTransitions.Initial)
+        {
+            AffectationLevel = request.AffectationLevel ?? AffectationLevels.FromSeverity(severity),
+        };
         return gateway.CreateImpactAsync(impact, ct);
     }
 
@@ -55,12 +59,15 @@ public sealed class ImpactService(
         updateValidator.Validate(request, current.Status).ThrowIfInvalid();
 
         var affected = request.AffectedPeople ?? 0;
+        var severity = ResolveSeverity(request, affected);
         var updated = current with
         {
             EventId = request.EventId!.Value,
             Latitude = ImpactRules.RoundCoordinate(request.Latitude!.Value),
             Longitude = ImpactRules.RoundCoordinate(request.Longitude!.Value),
-            Severity = severityPolicy.Resolve(request.Severity, affected),
+            Severity = severity,
+            AffectationLevel = request.AffectationLevel
+                ?? (request.Severity is null ? current.AffectationLevel : AffectationLevels.FromSeverity(severity)),
             AffectedPeople = affected,
             Municipality = Clean(request.Municipality),
             Department = Clean(request.Department),
@@ -80,6 +87,12 @@ public sealed class ImpactService(
     /// <summary>RN-09: el formulario es MANUAL; un dispositivo/simulador puede declarar DEVICE. FILE solo lo asigna la importación.</summary>
     public static ImpactSource ResolveSource(ImpactSource? requested) =>
         requested == ImpactSource.Device ? ImpactSource.Device : ImpactSource.Manual;
+
+    /// <summary>RN-04 ampliada: severidad explícita; si no, la del nivel 1..5; si no, la derivada de las personas.</summary>
+    private Severity ResolveSeverity(CreateImpactRequest request, int affected) =>
+        request.Severity is null && request.AffectationLevel is { } level
+            ? AffectationLevels.ToSeverity(level)
+            : severityPolicy.Resolve(request.Severity, affected);
 
     private static string? Clean(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
 }

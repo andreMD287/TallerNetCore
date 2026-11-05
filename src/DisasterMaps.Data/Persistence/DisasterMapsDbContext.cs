@@ -32,6 +32,7 @@ public sealed class DisasterMapsDbContext(DbContextOptions<DisasterMapsDbContext
             t.HasCheckConstraint("ck_impacts_people", "affected_people >= 0");
             t.HasCheckConstraint("ck_impacts_severity", "severity IN ('LOW','MEDIUM','HIGH','CRITICAL')");
             t.HasCheckConstraint("ck_impacts_status", "status IN ('REPORTED','VERIFIED','ATTENDED')");
+            t.HasCheckConstraint("ck_impacts_level", "affectation_level BETWEEN 1 AND 5");
         });
         impacts.HasKey(x => x.Id);
         impacts.Property(x => x.Id).HasColumnName("id").ValueGeneratedNever();
@@ -47,9 +48,14 @@ public sealed class DisasterMapsDbContext(DbContextOptions<DisasterMapsDbContext
         impacts.Property(x => x.Source).HasColumnName("source").HasMaxLength(16).IsRequired();
         impacts.Property(x => x.Status).HasColumnName("status").HasMaxLength(16).IsRequired();
         impacts.Property(x => x.IsDeleted).HasColumnName("is_deleted").HasDefaultValue(false);
+        impacts.Property(x => x.AffectationLevel).HasColumnName("affectation_level");
+        impacts.Property(x => x.DeviceId).HasColumnName("device_id").HasMaxLength(64);
+        impacts.Property(x => x.ReceivedAt).HasColumnName("received_at")
+            .HasColumnType("timestamp with time zone").HasDefaultValueSql("now()");
         impacts.HasQueryFilter(x => !x.IsDeleted);
         impacts.HasIndex(x => x.EventId).HasDatabaseName("ix_impacts_event_id");
         impacts.HasIndex(x => new { x.Latitude, x.Longitude }).HasDatabaseName("ix_impacts_coordinates");
         impacts.HasIndex(x => x.ReportedAt).HasDatabaseName("ix_impacts_reported_at");
+        impacts.HasIndex(x => x.DeviceId).HasDatabaseName("ix_impacts_device_id");
     }
 }

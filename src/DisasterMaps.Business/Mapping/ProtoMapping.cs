@@ -48,12 +48,28 @@ public static class ProtoMapping
         ReportedAt = Timestamp.FromDateTimeOffset(i.ReportedAt),
         Source = i.Source.ToProto(),
         Status = i.Status.ToProto(),
+        AffectationLevel = i.AffectationLevel,
+        DeviceId = i.DeviceId ?? string.Empty,
     };
 
     public static ImpactDto ToDto(this Proto.Impact i) => new(
         Guid.Parse(i.Id), Guid.Parse(i.EventId), i.Latitude, i.Longitude, i.Severity.ToDomain(), i.AffectedPeople,
         NullIfEmpty(i.Municipality), NullIfEmpty(i.Department), NullIfEmpty(i.Description),
-        i.ReportedAt?.ToDateTimeOffset() ?? DateTimeOffset.MinValue, i.Source.ToDomain(), i.Status.ToDomain());
+        i.ReportedAt?.ToDateTimeOffset() ?? DateTimeOffset.MinValue, i.Source.ToDomain(), i.Status.ToDomain())
+    {
+        AffectationLevel = i.AffectationLevel > 0 ? i.AffectationLevel : AffectationLevels.FromSeverity(i.Severity.ToDomain()),
+        DeviceId = NullIfEmpty(i.DeviceId),
+        ReceivedAt = i.ReceivedAt?.ToDateTimeOffset(),
+    };
+
+    public static Proto.IngestStrategy ToProto(this IngestStrategy? v) =>
+        v is null ? Proto.IngestStrategy.Unspecified : (Proto.IngestStrategy)(int)v.Value;
+
+    public static IngestStrategy ToDomain(this Proto.IngestStrategy v) =>
+        v == Proto.IngestStrategy.Unspecified ? IngestStrategy.Database : (IngestStrategy)(int)v;
+
+    public static SyncItemStatus ToDomain(this Proto.IngestOutcome v) =>
+        v == Proto.IngestOutcome.Unspecified ? SyncItemStatus.Rejected : (SyncItemStatus)(int)v;
 
     public static MunicipalitySummaryDto ToDto(this Proto.MunicipalitySummary s) =>
         new(s.Municipality, s.Department, s.Impacts, s.AffectedPeople, s.MaxSeverity.ToDomain());

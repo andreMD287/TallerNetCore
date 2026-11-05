@@ -7,6 +7,12 @@ public enum EventType { Flood = 1, Landslide = 2, Earthquake = 3, Wildfire = 4, 
 
 public enum Severity { Low = 1, Medium = 2, High = 3, Critical = 4 }
 
-public enum ImpactSource { Manual = 1, File = 2, Device = 3 }
+public enum ImpactSource { Manual = 1, File = 2, Device = 3, Mobile = 4 }
+
+/// <summary>Estrategia de carga por lotes en el tier de Datos.</summary>
+public enum IngestStrategy { Dal = 1, Database = 2 }
+
+/// <summary>Resultado de un registro sincronizado desde un dispositivo.</summary>
+public enum SyncItemStatus { Inserted = 1, Duplicate = 2, Conflict = 3, Rejected = 4 }
 
 public enum ImpactStatus { Reported = 1, Verified = 2, Attended = 3 }

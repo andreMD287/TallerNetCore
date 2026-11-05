@@ -17,6 +17,8 @@ public sealed class CreateImpactValidator(TimeProvider clock)
             errors.Add(ImpactRules.Fields.Longitude, "La longitud es obligatoria.");
         if (r.Severity is { } s && !Enum.IsDefined(s))
             errors.Add("severity", "La severidad no es válida.");
+        if (r.AffectationLevel is { } level && !AffectationLevels.IsValid(level))
+            errors.Add("affectationLevel", "El nivel de afectación debe estar entre 1 y 5.");
 
         if (r.Latitude is { } lat && r.Longitude is { } lon)
             errors.AddRange(ImpactRules.Check(lat, lon, r.AffectedPeople ?? 0, r.ReportedAt, clock.GetUtcNow()));

@@ -17,6 +17,7 @@
 | DELETE | `/api/v1/impacts/{id}` | borrar (soft delete) | 204 / 404 |
 | POST | `/api/v1/impacts/import` (multipart: `file`, `eventId`) | **leer** CSV o GeoJSON | 200 `ImportReport` |
 | GET | `/api/v1/stats/by-municipality?eventId` | resumen | 200 `MunicipalitySummaryDto[]` |
+| POST | `/api/v1/sync/batch?strategy&chunkSize` | **sincronizar** lo capturado sin conexión (app móvil), sección 6 | 200 `SyncReport` |
 | GET | `/health` | salud (incluye chequeo de Data) | 200 / 503 |
 
 JSON (camelCase, enums como string, fechas ISO-8601 UTC):
@@ -27,12 +28,16 @@ JSON (camelCase, enums como string, fechas ISO-8601 UTC):
 // ImpactDto
 { "id": "uuid", "eventId": "uuid", "latitude": 1.1522, "longitude": -76.6466,
   "severity": "HIGH", "affectedPeople": 120, "municipality": "Mocoa", "department": "Putumayo",
-  "description": "...", "reportedAt": "2026-11-03T15:20:00Z", "source": "MANUAL", "status": "REPORTED" }
+  "description": "...", "reportedAt": "2026-11-03T15:20:00Z", "source": "MANUAL", "status": "REPORTED",
+  "affectationLevel": 3, "deviceId": null, "receivedAt": "2026-11-03T15:20:02Z" }
+// affectationLevel: nivel 1..5 (si el registro solo trae severidad: LOW=1, MEDIUM=2, HIGH=3, CRITICAL=4).
+// reportedAt = cuándo ocurrió (T_eff). receivedAt = cuándo lo incorporó la plataforma (T_sys).
 
 // CreateImpactRequest (POST) / UpdateImpactRequest (PUT: mismos campos + status)
 { "eventId": "uuid", "latitude": 1.1522, "longitude": -76.6466,
   "severity": null, "affectedPeople": 120, "municipality": "Mocoa", "department": "Putumayo",
-  "description": "...", "reportedAt": null, "source": "MANUAL" }
+  "description": "...", "reportedAt": null, "source": "MANUAL", "affectationLevel": null }
+// affectationLevel opcional (1..5): si viene sin severity, la severidad se deriva de él.
 
 // PagedResult<T>
 { "items": [ ], "total": 57, "page": 1, "pageSize": 100 }
@@ -112,5 +117,44 @@ Errores: `application/problem+json` (RFC 7807, `ProblemDetails`); los de validac
 - **RN-06** Importación: archivo ≤ 5 MB y ≤ 10.000 filas. Se valida fila por fila; las válidas se envían en **un solo lote atómico** y las inválidas se reportan con línea y motivo. Si no hay ninguna válida → 400 con el reporte.
 - **RN-07** Dentro de un mismo archivo, filas con las mismas coordenadas (5 decimales) y la misma `reported_at` se reportan como duplicadas.
 - **RN-08** El borrado es lógico (`is_deleted`): la afectación deja de aparecer en consultas pero se conserva el histórico.
-- **RN-09** `source` lo asigna Business según el canal: formulario → MANUAL, importación → FILE, simulador/dispositivo → DEVICE (el request puede traer DEVICE; MANUAL por defecto).
+- **RN-09** `source` lo asigna Business según el canal: formulario → MANUAL, importación → FILE, simulador/dispositivo → DEVICE (el request puede traer DEVICE; MANUAL por defecto), sincronización móvil → MOBILE (solo por `/sync/batch`).
 - **RN-10** Estado inicial siempre REPORTED; transiciones permitidas: REPORTED → VERIFIED → ATTENDED (no se retrocede).
+- **RN-11** Nivel de afectación 1..5. Se relaciona con la severidad así: 1 → LOW, 2 → MEDIUM, 3 → HIGH, 4 y 5 → CRITICAL.
+- **RN-12** Sincronización: la identidad de un reporte la genera el dispositivo (`clientId`) y es el `id` definitivo. Un reenvío con el mismo contenido es DUPLICATE; con contenido distinto es CONFLICT. Nunca se sobrescribe en silencio.
+
+## 6. Sincronización de la app móvil (`POST /api/v1/sync/batch`)
+
+La app guarda los reportes en el teléfono mientras no hay conexión. Al recuperarla envía los pendientes en lotes a este endpoint. La carga **no es atómica**: un registro inválido no bloquea a los demás.
+
+```json
+// SyncBatchRequest
+{ "batchId": "uuid", "deviceId": "android-3f9c...",
+  "items": [
+    { "clientId": "uuid-v7 generado en el teléfono", "eventId": "uuid",
+      "latitude": 1.152212, "longitude": -76.646601, "affectationLevel": 4,
+      "affectedPeople": 30, "municipality": "Mocoa", "department": "Putumayo",
+      "description": "...", "reportedAt": "2026-11-05T09:12:44Z" } ] }
+
+// SyncReport (200)
+{ "batchId": "uuid", "deviceId": "android-3f9c...", "received": 3,
+  "inserted": 1, "duplicates": 1, "conflicts": 0, "rejected": 1,
+  "strategy": "DAL", "chunks": 1, "elapsedMs": 12, "serverTime": "2026-11-05T17:00:01Z",
+  "results": [
+    { "clientId": "uuid", "status": "INSERTED", "reason": null, "errors": null },
+    { "clientId": "uuid", "status": "DUPLICATE", "reason": null, "errors": null },
+    { "clientId": "uuid", "status": "REJECTED", "reason": "El registro no cumple las reglas de negocio.",
+      "errors": { "affectationLevel": ["El nivel de afectación debe estar entre 1 y 5."] } } ] }
+```
+
+| `status` | Significado | Qué hace la app |
+|---|---|---|
+| `INSERTED` | Quedó en el sistema central | Lo marca como sincronizado |
+| `DUPLICATE` | Ya estaba (reenvío tras perder la respuesta, o repetido en el lote) | Lo marca como sincronizado |
+| `CONFLICT` | Ya existe ese `clientId` con otro contenido; no se sobrescribe | Lo deja para revisión, sin reintentar |
+| `REJECTED` | Incumple una regla (`errors` por campo) o el evento no existe (`reason`) | Lo deja para revisión, sin reintentar |
+
+- Obligatorios por registro: `clientId`, `eventId`, `latitude`, `longitude`, `affectationLevel` (1..5) y `reportedAt` (hora de captura, no puede estar en el futuro con tolerancia de 5 min). Aplican RN-01, RN-03 y RN-05.
+- Errores del lote completo → **400** `ValidationProblemDetails`: falta `batchId` o `deviceId` (≤ 64 caracteres), `items` vacío o con más de 10.000 registros, algún registro sin `clientId`, `chunkSize` fuera de [1, 5000].
+- **503** si el tier de Datos no está disponible: la app conserva todo y reintenta después.
+- `strategy` (`DAL` o `DATABASE`) y `chunkSize` son opcionales y sirven para comparar las dos formas de carga (`scripts/benchmark-ingesta.ps1`). Sin `strategy`, Data elige por tamaño: DAL por debajo de 2000 registros y DATABASE desde ahí (ver DEC-10).
+- gRPC: `IngestImpactsBatch` (Business → Data) devuelve un resultado por registro (`INSERTED`, `DUPLICATE`, `CONFLICT` o `REJECTED`). Se reintenta ante `UNAVAILABLE` porque es idempotente.

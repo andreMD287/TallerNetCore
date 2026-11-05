@@ -10,4 +10,6 @@ public sealed class DataTierOptions
     public string Address { get; set; } = "http://localhost:5003";
     /// <summary>Deadline por llamada gRPC (incluye los reintentos).</summary>
     public double DeadlineSeconds { get; set; } = 3;
+    /// <summary>Deadline de la carga por lotes (lotes de hasta 10 000 registros).</summary>
+    public double BatchDeadlineSeconds { get; set; } = 60;
 }

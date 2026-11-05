@@ -1,4 +1,5 @@
 using DisasterMaps.Business.Api.Dtos;
+using DisasterMaps.Business.Domain;
 using DisasterMaps.Business.Mapping;
 using Grpc.Core;
 using Microsoft.Extensions.Options;
@@ -53,6 +54,21 @@ public sealed class GrpcDataGateway(
         request.Impacts.AddRange(impacts.Select(i => i.ToProto()));
         var reply = await client.CreateImpactsBatchAsync(request, deadline: Deadline, cancellationToken: ct);
         return reply.Inserted;
+    }
+
+    public async Task<IngestResult> IngestImpactsBatchAsync(Guid batchId, IReadOnlyList<ImpactDto> impacts, IngestStrategy? strategy, int? chunkSize, CancellationToken ct)
+    {
+        var request = new Proto.IngestBatchRequest
+        {
+            BatchId = batchId.ToString(), Strategy = strategy.ToProto(), ChunkSize = chunkSize ?? 0,
+        };
+        request.Impacts.AddRange(impacts.Select(i => i.ToProto()));
+        var reply = await client.IngestImpactsBatchAsync(request,
+            deadline: DateTime.UtcNow.AddSeconds(options.Value.BatchDeadlineSeconds), cancellationToken: ct);
+        var items = reply.Results
+            .Select(r => new IngestItem(Guid.Parse(r.Id), r.Outcome.ToDomain(), string.IsNullOrEmpty(r.Reason) ? null : r.Reason))
+            .ToList();
+        return new IngestResult(items, reply.Strategy.ToDomain(), reply.Chunks, reply.ElapsedMs);
     }
 
     public async Task<ImpactDto> GetImpactAsync(Guid id, CancellationToken ct)

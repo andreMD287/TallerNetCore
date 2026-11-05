@@ -1,10 +1,9 @@
-# Solo para desarrollo: publica Business (Scalar en /scalar/v1) y Postgres al host.
+# Solo para desarrollo: habilita Scalar (/scalar/v1) en Business y publica Postgres al host.
+# El puerto 5002 de Business ya lo publica docker-compose.yml (lo usa la app móvil).
 services:
   business:
     environment:
       OpenApi__Enabled: "true"
-    ports:
-      - "5002:5002"
   postgres:
     ports:
       - "5432:5432"

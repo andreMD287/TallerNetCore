@@ -1,3 +1,4 @@
+using DisasterMaps.Data.Ingestion;
 using DisasterMaps.Data.Persistence;
 using DisasterMaps.Data.Repositories;
 using DisasterMaps.Data.Seed;
@@ -14,8 +15,16 @@ var connectionString = builder.Configuration.GetConnectionString("DisasterMaps")
 // Un mismo data source de Npgsql para EF Core y la importación ADO.NET/COPY.
 builder.Services.AddSingleton(NpgsqlDataSource.Create(connectionString));
 builder.Services.AddDbContext<DisasterMapsDbContext>((sp, options) =>
-    options.UseNpgsql(sp.GetRequiredService<NpgsqlDataSource>()));
+    options.UseNpgsql(sp.GetRequiredService<NpgsqlDataSource>())
+        // Las migraciones son SQL escrito a mano: el esquema lo definen ellas y no el snapshot,
+        // que se arma sin convenciones y siempre difiere del modelo en tiempo de ejecución.
+        .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning)));
 builder.Services.AddScoped<ImpactBulkWriter>();
+// Carga por lotes de la app móvil: dos estrategias intercambiables por configuración o por solicitud.
+builder.Services.Configure<IngestionOptions>(builder.Configuration.GetSection(IngestionOptions.Section));
+builder.Services.AddScoped<IImpactIngestionStrategy, DalIngestionStrategy>();
+builder.Services.AddScoped<IImpactIngestionStrategy, DatabaseIngestionStrategy>();
+builder.Services.AddScoped<ImpactIngestor>();
 builder.Services.AddGrpc();
 builder.Services.AddGrpcHealthChecks().AddCheck("postgres", () =>
 {
